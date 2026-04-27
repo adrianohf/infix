@@ -1,8 +1,0 @@
-:testgroup:
-== ietf-syslog
-
-<<<
-
-include::basic/Readme.adoc[]
-
-include::remote/Readme.adoc[]

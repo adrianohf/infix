@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <termios.h>
 
@@ -14,7 +15,7 @@
 static char rawgetch(void)
 {
 	struct termios saved, c;
-	char key;
+	int key;
 
 	if (tcgetattr(fileno(stdin), &saved) < 0)
 		return -1;
@@ -33,7 +34,10 @@ static char rawgetch(void)
 	key = getchar();
 	tcsetattr(fileno(stdin), TCSANOW, &saved);
 
-	return key;
+	if (key == EOF)
+		return -1;
+
+	return (char)key;
 }
 
 int yorn(const char *fmt, ...)
@@ -64,52 +68,105 @@ int has_ext(const char *fn, const char *ext)
 	return 0;
 }
 
-static const char *basenm(const char *fn)
+int dirlen(const char *path)
 {
-	const char *ptr;
+	const char *slash;
 
-	if (!fn)
-		return "";
+	slash = strrchr(path, '/');
+	if (slash)
+		return slash - path;
 
-	ptr = strrchr(fn, '/');
-	if (!ptr)
-		ptr = fn;
-
-	return ptr;
+	return 0;
 }
 
-char *cfg_adjust(const char *fn, const char *tmpl, char *buf, size_t len)
+const char *basenm(const char *path)
 {
-	if (strstr(fn, "../"))
-		return NULL;	/* relative paths not allowed */
+	const char *slash;
 
-	if (fn[0] == '/') {
-		strlcpy(buf, fn, len);
-		return buf;	/* allow absolute paths */
+	if (!path)
+		return NULL;
+
+	slash = strrchr(path, '/');
+	if (slash)
+		return slash[1] ? slash + 1 : NULL;
+
+	return path;
+}
+
+static int path_allowed(const char *path)
+{
+	const char *accepted[] = {
+		"/media/",
+		"/cfg/",
+		getenv("HOME"),
+		NULL
+	};
+
+	for (int i = 0; accepted[i]; i++) {
+		if (!strncmp(path, accepted[i], strlen(accepted[i])))
+			return 1;
 	}
 
-	/* Files in /cfg must end in .cfg */
-	if (!strncmp(fn, "/cfg/", 5)) {
-		strlcpy(buf, fn, len);
-		if (!has_ext(fn, ".cfg"))
-			strlcat(buf, ".cfg", len);
+	return 0;
+}
 
-		return buf;
+char *cfg_adjust(const char *path, const char *template, bool sanitize)
+{
+	char *expanded = NULL, *resolved = NULL;
+	const char *basename;
+	int dlen;
+
+	dlen = dirlen(path);
+	basename = basenm(path) ? : basenm(template);
+	if (!basename)
+		goto err;
+
+	if (sanitize) {
+		if (strstr(path, "../"))
+			goto err;
+
+		if (path[0] == '/') {
+			if (!path_allowed(path))
+				goto err;
+		}
+
+		/* CLI users save to /cfg by default, unless abs. path */
+		if (asprintf(&expanded, "%s%.*s/%s%s",
+			     path[0] == '/' ? "" : "/cfg/",
+			     dlen, path,
+			     basename,
+			     strchr(basename, '.') ? "" : ".cfg") < 0)
+			goto err;
+	} else {
+		/* Shell users expect copy to behave more like cp */
+		expanded = strdup(path);
 	}
 
-	/* Files ending with .cfg belong in /cfg */
-	if (has_ext(fn, ".cfg")) {
-		snprintf(buf, len, "/cfg/%s", fn);
-		return buf;
+
+	if (sanitize) {
+		resolved = realpath(expanded, NULL);
+		if (!resolved) {
+			if (errno == ENOENT)
+				goto out;
+			else
+				goto err;
+		}
+
+		/* File exists, make sure that the resolved symlink
+		 * still matches the whitelist.
+		 */
+		if (!path_allowed(resolved))
+			goto err;
+
+		free(expanded);
+		expanded = resolved;
 	}
 
-	if (strlen(fn) > 0 && fn[0] == '.' && tmpl) {
-		if (fn[1] == '/' && fn[2] != 0)
-			strlcpy(buf, fn, len);
-		else
-			strlcpy(buf, basenm(tmpl), len);
-	} else
-		strlcpy(buf, fn, len);
+out:
+	return expanded;
 
-	return buf;
+err:
+	free(resolved);
+	free(expanded);
+	return NULL;
 }

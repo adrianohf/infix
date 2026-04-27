@@ -36,18 +36,22 @@ AM_CONDITIONAL(CONTAINERS,   [test "x$enable_containers" != "xno"])
 # Check for pkg-config first, warn if it's not installed
 PKG_PROG_PKG_CONFIG
 
-PKG_CHECK_MODULES([jansson], [jansson >= 2.0.0])
-PKG_CHECK_MODULES([libite],  [libite  >= 2.6.1])
-PKG_CHECK_MODULES([libyang], [libyang >= 2.1.80])
-PKG_CHECK_MODULES([sysrepo], [sysrepo >= 2.2.36])
-PKG_CHECK_MODULES([libsrx],  [libsrx  >= 1.0.0])
+PKG_CHECK_MODULES([jansson],      [jansson      >= 2.0.0])
+PKG_CHECK_MODULES([libite],       [libite       >= 2.6.1])
+PKG_CHECK_MODULES([libyang],      [libyang      >= 2.1.80])
+PKG_CHECK_MODULES([sysrepo],      [sysrepo      >= 2.2.36])
+PKG_CHECK_MODULES([libsrx],       [libsrx       >= 1.0.0])
+PKG_CHECK_MODULES([avahi_client], [avahi-client >= 0.7])
 
 AC_CHECK_HEADER([ev.h],
-    [AC_CHECK_LIB([ev], [ev_loop_new],
-        [],
-	[AC_MSG_ERROR("libev not found")] )],
+    [saved_LIBS="$LIBS"
+     AC_CHECK_LIB([ev], [ev_loop_new],
+        [EV_LIBS="-lev"],
+	[AC_MSG_ERROR("libev not found")] )
+     LIBS="$saved_LIBS"],
     [AC_MSG_ERROR("ev.h not found")]
 )
+AC_SUBST([EV_LIBS])
 
 test "x$prefix" = xNONE && prefix=$ac_default_prefix
 test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'

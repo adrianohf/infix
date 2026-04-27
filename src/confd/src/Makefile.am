@@ -1,7 +1,14 @@
 AM_CPPFLAGS             = -D_DEFAULT_SOURCE -D_XOPEN_SOURCE -D_GNU_SOURCE -DYANG_PATH_=\"$(YANGDIR)\"
+AM_CPPFLAGS            +=  -DCONFD_VERSION=\"$(PACKAGE_VERSION)\"
 CLEANFILES              = $(rauc_installer_sources)
 plugindir               = $(srpdplugindir)
 plugin_LTLIBRARIES      = confd-plugin.la
+
+sbin_PROGRAMS           = confd
+
+confd_CFLAGS            = $(sysrepo_CFLAGS) $(libyang_CFLAGS) $(jansson_CFLAGS) $(libite_CFLAGS) $(libsrx_CFLAGS)
+confd_LDADD             = $(sysrepo_LIBS)   $(libyang_LIBS)   $(jansson_LIBS)   $(libite_LIBS)   $(libsrx_LIBS) $(EV_LIBS) -ldl
+confd_SOURCES           = main.c
 
 confd_plugin_la_LDFLAGS = -module -avoid-version -shared
 
@@ -26,33 +33,39 @@ confd_plugin_la_SOURCES =			\
 	base64.c		base64.h	\
 	core.c			core.h		\
 	dagger.c		dagger.h	\
-	ietf-interfaces.c ietf-interfaces.h	\
+	interfaces.c interfaces.h		\
 	  ieee802-ethernet-interface.c		\
-	  ietf-ip.c				\
-	  infix-if-bridge.c			\
-	  infix-if-lag.c			\
-	  infix-if-bridge-mcd.c			\
-	  infix-if-bridge-port.c		\
-	  infix-if-veth.c			\
-	  infix-if-vlan.c			\
-	  infix-if-gre.c			\
-	  infix-if-vxlan.c			\
-	ietf-keystore.c				\
-	ietf-system.c				\
-	ietf-syslog.c				\
-	ietf-factory-default.c			\
-	ietf-routing.c				\
-	infix-dhcp-common.c			\
-	infix-dhcp-client.c			\
-	infix-dhcp-server.c			\
-	infix-factory.c				\
-	infix-meta.c				\
-	infix-services.c			\
-	infix-system-software.c 		\
-	ietf-hardware.c
+	  ip.c					\
+	  if-bridge.c				\
+	  if-lag.c				\
+	  if-bridge-mcd.c			\
+	  if-bridge-port.c			\
+	  if-veth.c				\
+	  if-vlan.c				\
+	  if-gre.c				\
+	  if-vxlan.c				\
+	  if-wifi.c				\
+          if-wireguard.c			\
+	keystore.c				\
+	system.c				\
+	ntp.c					\
+	ptp.c					\
+	syslog.c				\
+	factory-default.c			\
+	routing.c				\
+	dhcp-common.c				\
+	dhcp-client.c				\
+	dhcpv6-client.c				\
+	dhcp-server.c				\
+	factory.c				\
+	firewall.c				\
+	meta.c					\
+	services.c				\
+	system-software.c 			\
+	hardware.c
 
 if CONTAINERS
-confd_plugin_la_SOURCES += infix-containers.c cni.c cni.h
+confd_plugin_la_SOURCES += containers.c cni.c cni.h
 endif
 
 rauc_installer_sources = 			\

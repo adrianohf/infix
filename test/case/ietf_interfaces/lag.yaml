@@ -1,5 +1,0 @@
----
-- name: lag_basic
-  case: lag_basic/test.py
-- name: lag_failure
-  case: lag_failure/test.py

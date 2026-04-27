@@ -27,6 +27,10 @@ class Transport(ABC):
         pass
 
     @abstractmethod
+    def patch_config(self, modname, edit):
+        pass
+
+    @abstractmethod
     def get_dict(self, xpath=None):
         pass
 
@@ -74,6 +78,13 @@ class Transport(ABC):
     def has_model(self, model_name):
         """Check if the device has the given YANG model loaded."""
         return model_name in self.modules
+
+    def has_feature(self, model_name, feature_name):
+        """Check if a specific feature is enabled on the device for a given YANG model."""
+        if model_name not in self.modules:
+            return False
+        features = self.modules[model_name].get("feature", [])
+        return feature_name in features
 
     def reachable(self):
         """Check if the device reachable on ll6"""

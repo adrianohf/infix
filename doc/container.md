@@ -1,31 +1,7 @@
-Containers in Infix
-===================
-<img align="right" src="img/docker.webp" alt="Docker whale" width=360>
+Docker Container Support
+========================
 
-* [Introduction](#introduction)
-* [Caution](#caution)
-* [Getting Started](#getting-started)
-  * [Examples](#examples)
-* [Container Images](#container-images)
-* [Upgrading a Container Image](#upgrading-a-container-image)
-* [Networking and Containers](#networking-and-containers)
-  * [Container Bridge](#container-bridge)
-  * [Container Host Interface](#container-host-interface)
-  * [Host Networking](#host-networking)
-* [Mounts and Volumes](#mounts-and-volumes)
-  * [Content Mounts](#content-mounts)
-* [Example Containers](#example-containers)
-  * [System Container](#system-container)
-  * [Application Container: nftables](#application-container-nftables)
-  * [Application Container: ntpd](#application-container-ntpd)
-* [Advanced](#advanced)
-  * [Running Host Commands From Container](#running-host-commands-from-container)
-* [Container Requirements](#container-requirements)
-  * [Advanced Users](#advanced-users)
-
-
-Introduction
-------------
+![Docker whale](img/docker.webp){ align=right width="360" }
 
 Infix comes with native support for Docker containers using [podman][].
 The [YANG model][1] describes the current level of support, complete
@@ -110,45 +86,49 @@ your container image and application to run.
 > support the CPU architecture of your host system.  Remember, unlike
 > virtualization, containers reuse the host's CPU and kernel.
 
+![Hello World](img/docker-hello-world.svg){ align=right width="200" }
 
-<img align="right" src="img/docker-hello-world.svg" alt="Hello World" width=360>
-
-### Examples
+### Example: Hello World
 
 Classic Hello World:
 
-    admin@example:/> container run docker://hello-world
-    Starting docker://hello-world :: use Ctrl-p Ctrl-q to detach
-    Trying to pull docker.io/library/hello-world:latest...
-    Getting image source signatures
-    Copying blob c1ec31eb5944 done
-    Copying config d2c94e258d done
-    Writing manifest to image destination
-    Storing signatures
+<pre class="cli"><code>admin@example:/> <b>container run docker://hello-world</b>
+Starting docker://hello-world :: use Ctrl-p Ctrl-q to detach
+Trying to pull docker.io/library/hello-world:latest...
+Getting image source signatures
+Copying blob c1ec31eb5944 done
+Copying config d2c94e258d done
+Writing manifest to image destination
+Storing signatures
 
-    Hello from Docker!
-    This message shows that your installation appears to be working correctly.
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
+</code></pre>
+
+### Example: Web Server
 
 A web server with [nginx][], using standard docker bridge.  Podman will
 automatically create a VETH pair for us, connecting the container to the
 `docker0` bridge:
 
-    admin@example:/> configure
-    admin@example:/config/> edit interface docker0
-    admin@example:/config/interface/docker0/> set container-network
-    admin@example:/config/interface/docker0/> end
-    admin@example:/config/> edit container web
-    admin@example:/config/container/web/> set image docker://nginx:alpine
-    admin@example:/config/container/web/> set network publish 8080:80
-    admin@example:/config/container/web/> set network interface docker0
-    admin@example:/config/container/web/> set volume cache target /var/cache
-    admin@example:/config/container/web/> leave
-    admin@example:/> show container
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit interface docker0</b>
+admin@example:/config/interface/docker0/> <b>set container-network</b>
+admin@example:/config/interface/docker0/> <b>end</b>
+admin@example:/config/> <b>edit container web</b>
+admin@example:/config/container/web/> <b>set image docker://nginx:alpine</b>
+admin@example:/config/container/web/> <b>set network publish 8080:80</b>
+admin@example:/config/container/web/> <b>set network interface docker0</b>
+admin@example:/config/container/web/> <b>set volume cache target /var/cache</b>
+admin@example:/config/container/web/> <b>leave</b>
+admin@example:/> <b>show container</b>
+</code></pre>
 
 Exit to the shell and verify the service with curl, or try to attach
 to your device's IP address using your browser:
 
-    admin@example:~$ curl http://localhost:8080
+<pre class="cli"><code>admin@example:~$ <b>curl http://localhost:8080</b>
+</code></pre>
 
 or connect to port 8080 of your running Infix system with a browser.
 See the following sections for how to add more interfaces and manage
@@ -165,31 +145,32 @@ how to upgrade to a newer base image.
 
 The CLI help shows:
 
-    admin@example:/config/container/system/> help image
-    NAME
-        image <string>
+<pre class="cli"><code>admin@example:/config/container/system/> <b>help image</b>
+<b>NAME</b>
+    image &lt;string&gt;
 
-    DESCRIPTION
-        Docker image for the container: [transport]name[:tag|@digest]
+<b>DESCRIPTION</b>
+    Docker image for the container: [transport]name[:tag|@digest]
 
-        quay.io/username/myimage     -- Pull myimage:latest
-        docker://busybox             -- Pull busybox:latest from Docker Hub
-        docker://ghcr.io/usr/img     -- Pull img:latest from GitHub packages
-        dir:/media/usb/myimage:1.1   -- Use myimage v1.1 from USB media
-        docker-archive:/tmp/archive  -- Use archive:latest from tarball
-        oci-archive:/lib/oci/archive -- Use archive:latest from OCI archive
-                                        May be in .tar or .tar.gz format
+    quay.io/username/myimage     -- Pull myimage:latest
+    docker://busybox             -- Pull busybox:latest from Docker Hub
+    docker://ghcr.io/usr/img     -- Pull img:latest from GitHub packages
+    dir:/media/usb/myimage:1.1   -- Use myimage v1.1 from USB media
+    docker-archive:/tmp/archive  -- Use archive:latest from tarball
+    oci-archive:/lib/oci/archive -- Use archive:latest from OCI archive
+                                    May be in .tar or .tar.gz format
 
-        Additionally, the following URIs are also supported for setups
-        that do not use a HUB or similar.  Recommend using 'checksum'!
+    Additionally, the following URIs are also supported for setups
+    that do not use a HUB or similar.  Recommend using 'checksum'!
 
-        ftp://addr/path/to/archive   -- Downloaded using wget
-        http://addr/path/to/archive  -- Downloaded using curl
-        https://addr/path/to/archive -- Downloaded using curl
+    ftp://addr/path/to/archive   -- Downloaded using wget
+    http://addr/path/to/archive  -- Downloaded using curl
+    https://addr/path/to/archive -- Downloaded using curl
 
-        Note: if a remote repository cannot be reached, the creation of the
-              container will be put on a queue that retries pull every time
-              there is a route change in the host's system.
+    Note: if a remote repository cannot be reached, the creation of the
+          container will be put on a queue that retries pull every time
+          there is a route change in the host's system.
+</code></pre>
 
 > [!TIP]
 > The built-in help system in the CLI is generated from the YANG model,
@@ -221,26 +202,28 @@ mind.
 
 **Shell OCI Example:**
 
-    admin@example:~$ cd /var/tmp/
-    admin@example:/var/tmp$ sudo wget https://github.com/kernelkit/curiOS/releases/download/edge/curios-oci-amd64.tar.gz
-    Connecting to github.com (140.82.121.3:443)
-    wget: note: TLS certificate validation not implemented
-    Connecting to objects.githubusercontent.com (185.199.109.133:443)
-    saving to 'curios-oci-amd64.tar.gz'
-    curios-oci-amd64.tar 100% |*********************************| 7091k  0:00:00 ETA
-    'curios-oci-amd64.tar.gz' saved
-    admin@example:/var/tmp$ ll
-    total 7104
-    drwxr-xr-x    3 root     root          4096 Mar 27 14:22 ./
-    drwxr-xr-x   14 root     root          4096 Mar 27 11:57 ../
-    -rw-r--r--    1 root     root       7261785 Mar 27 14:22 curios-oci-amd64.tar.gz
-    drwx------    6 frr      frr           4096 Mar 27 11:57 frr/
+<pre class="cli"><code>admin@example:~$ <b>cd /var/tmp/</b>
+admin@example:/var/tmp$ <b>sudo wget https://github.com/kernelkit/curiOS/releases/download/edge/curios-oci-amd64.tar.gz</b>
+Connecting to github.com (140.82.121.3:443)
+wget: note: TLS certificate validation not implemented
+Connecting to objects.githubusercontent.com (185.199.109.133:443)
+saving to 'curios-oci-amd64.tar.gz'
+curios-oci-amd64.tar 100% |*********************************| 7091k  0:00:00 ETA
+'curios-oci-amd64.tar.gz' saved
+admin@example:/var/tmp$ <b>ll</b>
+total 7104
+drwxr-xr-x    3 root     root          4096 Mar 27 14:22 ./
+drwxr-xr-x   14 root     root          4096 Mar 27 11:57 ../
+-rw-r--r--    1 root     root       7261785 Mar 27 14:22 curios-oci-amd64.tar.gz
+drwx------    6 frr      frr           4096 Mar 27 11:57 frr/
+</code></pre>
 
 Importing the image into Podman can be done either from the CLI
 admin-exec context ...
 
-    admin@example:/var/tmp$ cli
-    admin@example:/> container load /var/tmp/curios-oci-amd64.tar.gz name curios:edge
+<pre class="cli"><code>admin@example:/var/tmp$ <b>cli</b>
+admin@example:/> <b>container load /var/tmp/curios-oci-amd64.tar.gz name curios:edge</b>
+</code></pre>
 
 > [!TIP]
 > The `name curios:edge` is the tag you give the imported (raw) archive
@@ -250,99 +233,237 @@ admin-exec context ...
 ... or by giving the container configuration the full path to the OCI
 archive, which helps greatly with container upgrades (see below):
 
-    admin@example:/config/container/system/> set image oci-archive:/var/tmp/curios-oci-amd64.tar.gz
+<pre class="cli"><code>admin@example:/config/container/system/> <b>set image oci-archive:/var/tmp/curios-oci-amd64.tar.gz</b>
+</code></pre>
 
 **Checksum Example:**
 
-    admin@example:/> configure
-    admin@example:/config/> edit container sys
-    admin@example:/config/container/sys/> set hostname sys
-    admin@example:/config/container/sys/> set image ftp://192.168.122.1/curios-oci-amd64-v24.05.0.tar.gz
-    admin@example:/config/container/sys/> set checksum
-        md5 sha256 sha512
-    admin@example:/config/container/sys/> set checksum sha256 4f01077036527498ed910f1a3e80645ae3eff629d10043cf80ebc6850c99c629
-    admin@example:/config/container/sys/> leave
-    admin@example:/> copy running-config startup-config
-    admin@example:/> show container
-    CONTAINER ID  IMAGE                                             COMMAND               CREATED         STATUS        PORTS       NAMES
-    b02e945c43c9  localhost/curios-oci-amd64-v24.05.0:latest                              5 seconds ago   Up 5 seconds              sys
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit container sys</b>
+admin@example:/config/container/sys/> <b>set hostname sys</b>
+admin@example:/config/container/sys/> <b>set image ftp://192.168.122.1/curios-oci-amd64-v24.05.0.tar.gz</b>
+admin@example:/config/container/sys/> <b>set checksum</b>
+    md5 sha256 sha512
+admin@example:/config/container/sys/> <b>set checksum sha256 4f01077036527498ed910f1a3e80645ae3eff629d10043cf80ebc6850c99c629</b>
+admin@example:/config/container/sys/> <b>leave</b>
+admin@example:/> <b>copy running-config startup-config</b>
+admin@example:/> <b>show container</b>
+<span class="header">NAME  STATUS         NETWORK  MEMORY (KiB)  CPU%</span>
+sys   Up 5 seconds                  72/512  0.02
 
-    admin@example:/> show log
-    ...
-    Nov 20 07:24:56 infix container[5040]: Fetching ftp://192.168.122.1/curios-oci-amd64-v24.05.0.tar.gz
-    Nov 20 07:24:56 infix container[5040]: curios-oci-amd64-v24.05.0.tar.gz downloaded successfully.
-    Nov 20 07:24:56 infix container[5040]: curios-oci-amd64-v24.05.0.tar.gz checksum verified OK.
-    Nov 20 07:24:57 infix container[5040]: Cleaning up extracted curios-oci-amd64-v24.05.0
-    Nov 20 07:24:57 infix container[5040]: podman create --name sys --conmon-pidfile=/run/container:sys.pid --read-only --replace --quiet --cgroup-parent=containers  --restart=always --systemd=false --tz=local --hostname sys --log-driver k8s-file --log-opt path=/run/containers/sys.fifo --network=none curios-oci-amd64-v24.05.0
-    Nov 20 07:24:57 infix container[3556]: b02e945c43c9bce2c4be88e31d6f63cfdb1a3c8bdd02179376eb059a49ae05e4
+admin@example:/> <b>show log</b>
+...
+Nov 20 07:24:56 example container[5040]: Fetching ftp://192.168.122.1/curios-oci-amd64-v24.05.0.tar.gz
+Nov 20 07:24:56 example container[5040]: curios-oci-amd64-v24.05.0.tar.gz downloaded successfully.
+Nov 20 07:24:56 example container[5040]: curios-oci-amd64-v24.05.0.tar.gz checksum verified OK.
+Nov 20 07:24:57 example container[5040]: Cleaning up extracted curios-oci-amd64-v24.05.0
+Nov 20 07:24:57 example container[5040]: podman create --name sys --conmon-pidfile=/run/container:sys.pid --read-only --replace --quiet --cgroup-parent=containers  --restart=always --systemd=false --tz=local --hostname sys --log-driver k8s-file --log-opt path=/run/containers/sys.fifo --network=none curios-oci-amd64-v24.05.0
+Nov 20 07:24:57 example container[3556]: b02e945c43c9bce2c4be88e31d6f63cfdb1a3c8bdd02179376eb059a49ae05e4
+</code></pre>
 
 
-Upgrading a Container Image
+Understanding Image Tags
+------------------------
+
+Docker images use tags to identify different versions of the same image.
+Understanding the difference between *mutable* and *immutable* tags is
+important for managing container upgrades effectively.
+
+### Mutable Tags
+
+Tags like `:latest`, `:edge`, or `:stable` are *mutable* — they point to
+different images over time as new versions are published to the registry.
+
+**Advantages:**
+
+ - Convenient: upgrade without changing configuration
+ - Simple: use the CLI command `container upgrade NAME` to get the latest version,  
+   there is even a convenient RPC for controlling the remotely
+ - Good for: development, testing, and systems that auto-update
+
+**Trade-offs:**
+
+ - Less reproducible: different systems may run different versions
+ - Less predictable: upgrades happen when you pull, not when you plan
+ - Harder to rollback: previous version may no longer be available
+
+**Example mutable tags:**
+
+```
+docker://nginx:latest          # Always points to newest release
+docker://myapp:edge            # Development/bleeding edge version
+oci-archive:/var/tmp/app.tar   # Local archive that may be replaced
+```
+
+### Immutable Tags
+
+Version-specific tags like `:v1.0.1`, `:24.11.0`, or digest references
+like `@sha256:abc123...` are *immutable* — they always reference the
+exact same image content.
+
+**Advantages:**
+
+ - Reproducible: all systems run identical versions
+ - Predictable: upgrades only happen when you change configuration
+ - Auditable: clear history of what ran when
+ - Good for: production, compliance, and controlled deployments
+
+**Trade-offs:**
+
+ - More explicit: must update configuration to upgrade
+ - Requires planning: need to know which version to use
+
+**Example immutable tags:**
+
+```
+docker://nginx:1.25.3          # Specific version number
+docker://myapp:v2.1.0          # Semantic version tag
+docker://nginx@sha256:abc123   # Cryptographic digest (most immutable)
+```
+
+> [!TIP]
+> **Best practice for production:** Use specific version tags (`:v1.0.1`)
+> rather than mutable tags (`:latest`). This ensures all your systems run
+> identical software and upgrades happen only when you decide.
+
+Upgrading Container Images
 ---------------------------
-<img align="right" src="img/shield-checkmark.svg" alt="Hello World" width=100>
+
+![Up-to-date Shield](img/shield-checkmark.svg){ align=right width="100" }
 
 The applications in your container are an active part of the system as a
 whole, so make it a routine to keep your container images up-to-date!
 
-Containers are created at first setup and at every boot.  If the image
-exists in the file system it is reused -- i.e., an image pulled from a
-remote registry is not fetched again.
+### How Container Lifecycle Works
 
-To upgrade a versioned image:
- - update your `running-config` to use the new `image:tag`
- - `leave` to activate the change, if you are in the CLI
- - Podman pulls the new image in the background
- - Your container is recreated with the new image
- - The container is started
+Infix intelligently manages container lifecycles to provide a smooth
+experience while minimizing unnecessary work:
 
-For "unversioned" images, e.g., images using a `:latest` or `:edge` tag,
-use the following CLI command (`NAME` is the name of your container):
+**At first setup:** When you configure a container for the first time,
+Infix fetches the image (if needed) and creates the container instance.
 
-    admin@example:/> container upgrade NAME
+**At boot time:** Infix checks if the container needs to be recreated by
+comparing checksums for:
 
-This stops the container, does `container pull IMAGE`, and recreates it
-with the new image.  Upgraded containers are automatically restarted.
+ - The image archive that the container was built from
+ - The container configuration script
+
+**When configuration changes:** If you modify any container settings
+(network, volumes, environment, etc.), the container is automatically
+recreated with the new configuration.
+
+**When explicitly upgraded:** Using the `container upgrade` command forces
+a fresh pull of the image and recreates the container.
+
+This means that in most cases, **containers persist across reboots** and
+are only recreated when actually necessary. Your container's state stored
+in volumes is preserved across recreations.  Since Infix containers use a
+read-only root filesystem, any changes written outside of volumes or the
+writable paths provided by Podman (`/dev`, `/dev/shm`, `/run`, `/tmp`,
+`/var/tmp`) will be lost when the container is recreated.
+
+### Method 1: Upgrading Immutable Tags
+
+When using version-specific tags, you upgrade by explicitly changing the
+image reference in your configuration:
+
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit container web</b>
+admin@example:/config/container/web/> <b>set image docker://nginx:1.25.3</b>
+admin@example:/config/container/web/> <b>leave</b>
+</code></pre>
+
+**What happens:**
+
+ 1. Podman pulls the new image in the background (if not already present)
+ 2. Your container is automatically stopped
+ 3. The container is recreated with the new image
+ 4. The container is started with your existing volumes intact
+
+**Example:** Upgrading from one version to another:
+
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit container system</b>
+admin@example:/config/container/system/> <b>show image</b>
+image ghcr.io/kernelkit/curios:v24.11.0;
+admin@example:/config/container/system/> <b>set image ghcr.io/kernelkit/curios:v24.12.0</b>
+admin@example:/config/container/system/> <b>leave</b>
+admin@example:/> <b>show log</b>
+...
+Dec 13 14:32:15 example container[1523]: Pulling ghcr.io/kernelkit/curios:v24.12.0...
+Dec 13 14:32:18 example container[1523]: Stopping old container instance...
+Dec 13 14:32:19 example container[1523]: Creating new container with updated image...
+Dec 13 14:32:20 example container[1523]: Container system started successfully
+</code></pre>
+
+### Method 2: Upgrading Mutable Tags
+
+For images using mutable tags like `:latest` or `:edge`, use the
+`container upgrade` command:
+
+<pre class="cli"><code>admin@example:/> <b>container upgrade NAME</b>
+</code></pre>
+
+This command:
+
+ 1. Stops the running container
+ 2. Pulls the latest version of the image from the registry
+ 3. Recreates the container with the new image
+ 4. Starts the container automatically
 
 **Example using registry:**
 
-	admin@example:/> container upgrade system
-	system
-	Trying to pull ghcr.io/kernelkit/curios:edge...
-	Getting image source signatures
-	Copying blob 07bfba95fe93 done
-	Copying config 0cb6059c0f done
-	Writing manifest to image destination
-	Storing signatures
-	0cb6059c0f4111650ddbc7dbc4880c64ab8180d4bdbb7269c08034defc348f17
-	system: not running.
-	59618cc3c84bef341c1f5251a62be1592e459cc990f0b8864bc0f5be70e60719
+<pre class="cli"><code>admin@example:/> <b>container upgrade system</b>
+system
+Trying to pull ghcr.io/kernelkit/curios:edge...
+Getting image source signatures
+Copying blob 07bfba95fe93 done
+Copying config 0cb6059c0f done
+Writing manifest to image destination
+Storing signatures
+0cb6059c0f4111650ddbc7dbc4880c64ab8180d4bdbb7269c08034defc348f17
+system: not running.
+59618cc3c84bef341c1f5251a62be1592e459cc990f0b8864bc0f5be70e60719
+</code></pre>
 
-An OCI archive image can be upgraded in a similar manner, the first step
-is of course to get the new archive onto the system (see above), and
-then, provided the `oci-archive:/path/to/archive` format is used, call
-the upgrade command as
+**Example using local OCI archive:**
 
-	admin@example:/> container upgrade system
-	Upgrading container system with local archive: oci-archive:/var/tmp/curios-oci-amd64.tar.gz ...
-	7ab4a07ee0c6039837419b7afda4da1527a70f0c60c0f0ac21cafee05ba24b52
+An OCI archive image can be upgraded in a similar manner. First, get the
+new archive onto the system (see Container Images section above), then,
+provided the `oci-archive:/path/to/archive` format is used in your
+configuration, call the upgrade command:
 
-OCI archives can also be fetched from ftp/http/https URL, in that case
-the upgrade can be done the same way as a registry image (above).
+<pre class="cli"><code>admin@example:/> <b>container upgrade system</b>
+Upgrading container system with local archive: oci-archive:/var/tmp/curios-oci-amd64.tar.gz ...
+7ab4a07ee0c6039837419b7afda4da1527a70f0c60c0f0ac21cafee05ba24b52
+</code></pre>
+
+OCI archives can also be fetched from ftp/http/https URLs. In that case,
+the upgrade works the same way as a registry image — Infix downloads the
+new archive and recreates the container.
+
+### Embedded Container Images
 
 > [!TIP]
 > Containers running from OCI images embedded in the operating system,
-> e.g., `/lib/oci/mycontainer.tar.gz`, always run from the version in
-> the operating system.  To upgrade, install the new container image at
-> build time, after system upgrade the container is also upgraded.  The
-> system unpacks and loads the OCI images into Podman every boot, which
-> ensures the running container always has known starting state.
+> e.g., `/lib/oci/mycontainer.tar.gz`, are automatically kept in sync
+> with the Infix system image version.
+>
+> **How it works:** When you build a custom Infix image with embedded OCI
+> archives, those containers will be upgraded whenever you upgrade the
+> Infix operating system itself. At boot, Infix checks if the embedded
+> image has changed and automatically recreates the container if needed.
 >
 > **Example:** default builds of Infix include a couple of OCI images
 > for reference, one is `/lib/oci/curios-nftables-v24.11.0.tar.gz`, but
 > there is also a symlink called `curios-nftables-latest.tar.gz` in the
 > same directory, which is what the Infix regression tests use in the
-> image configuration of the container.  This is what enables easy
-> upgrades of the container along with the system itself.
+> image configuration of the container. When the system is upgraded and
+> the embedded image changes, the test containers are automatically
+> recreated with the new version.
+>
+> This approach ensures your embedded containers always match your system
+> version without any manual intervention.
 
 
 Capabilities
@@ -354,20 +475,63 @@ occasions where they are too restricted and users start looking for the
 
 For example, a system container from which `ping` does not work:
 
-	admin@example:/config/container/system/> edit capabilities
-	admin@example:/config/container/system/capabilities/> set add net_raw
-	admin@example:/config/container/system/capabilities/> end
-	admin@infix-00-00-00:/config/container/system/> show
-	...
-	capabilities {
-	  add net_raw;
-	}
-	...
+<pre class="cli"><code>admin@example:/config/container/system/> <b>edit capabilities</b>
+admin@example:/config/container/system/capabilities/> <b>set add net_raw</b>
+admin@example:/config/container/system/capabilities/> <b>end</b>
+admin@infix-00-00-00:/config/container/system/> <b>show</b>
+...
+capabilities {
+  add net_raw;
+}
+...
+</code></pre>
 
 Infix supports a subset of all [capabilities][6] that are relevant for
 containers.  Please note, that this is an advanced topic that require
 time and analysis of your container application to figure out which
 capabilities you need.
+
+
+Resource Limits
+---------------
+
+Containers can be configured with resource limits to control their memory
+and CPU usage. This helps prevent containers from consuming excessive system
+resources and ensures fair resource allocation across multiple containers.
+
+### Configuring Resource Limits
+
+Resource limits are set per container and include:
+
+ - **Memory:** Maximum memory usage in kibibytes (KiB)
+ - **CPU:** Maximum CPU usage in millicores (1000 millicores = 1 CPU core)
+
+Example configuration limiting a container to 512 MiB of memory and 1.5 CPU cores:
+
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit container web</b>
+admin@example:/config/container/web/> <b>edit resource-limit</b>
+admin@example:/config/container/web/resource-limit/> <b>set memory 524288</b>
+admin@example:/config/container/web/resource-limit/> <b>set cpu 1500</b>
+admin@example:/config/container/web/resource-limit/> <b>leave</b>
+</code></pre>
+
+Common CPU limit examples:
+
+ - `500` = 0.5 cores (50% of one core)
+ - `1000` = 1.0 cores (one full core)
+ - `2000` = 2.0 cores (two full cores)
+
+### Monitoring Resource Usage
+
+Runtime resource usage statistics are available in the operational datastore:
+
+<pre class="cli"><code>admin@example:/> <b>show container web</b>
+...
+</code></pre>
+
+Use `show container usage` to see resource consumption across all containers,
+including memory, CPU, block I/O, network I/O, and process counts.
 
 
 Networking and Containers
@@ -405,10 +569,11 @@ container use seem to be so simple.
 
 All interface configuration is done in configure context.
 
-    admin@example:/> configure
-    admin@example:/config> edit interface docker0
-    admin@example:/config/interface/docker0/> set container-network
-    admin@example:/config/interface/docker0/> leave
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config> <b>edit interface docker0</b>
+admin@example:/config/interface/docker0/> <b>set container-network</b>
+admin@example:/config/interface/docker0/> <b>leave</b>
+</code></pre>
 
 There is more to this story.  When using the CLI, and sticking to common
 interface nomenclature, Infix helps you with some of the boring stuff.
@@ -416,8 +581,9 @@ E.g., creating a new interface with a name like `brN` or `dockerN`
 automatically *infers* the interface types, which you would otherwise
 have to set manually:
 
-    admin@example:/config/interface/docker0/> set type bridge
-    admin@example:/config/interface/docker0/> set container-network type bridge
+<pre class="cli"><code>admin@example:/config/interface/docker0/> <b>set type bridge</b>
+admin@example:/config/interface/docker0/> <b>set container-network type bridge</b>
+</code></pre>
 
 > [!IMPORTANT]
 > When configuring the system via an API such as NETCONF or RESTCONF, no
@@ -443,16 +609,17 @@ other networking parameters (DNS, default route) are set up.
 Some of the defaults of a container `bridge` can be changed, e.g.,
 instead of `set container-network type bridge`, above, do:
 
-    admin@example:/config/interface/docker0/> edit container-network
-    admin@example:/config/interface/docker0/container-network/> set type bridge
-    admin@example:/config/interface/docker0/container-network/> edit subnet 192.168.0.0/16
-    admin@example:/config/interface/docker0/container-network/subnet/192.168.0.0/16/> set gateway 192.168.255.254
-    admin@example:/config/interface/docker0/container-network/subnet/192.168.0.0/16/> end
-    admin@example:/config/interface/docker0/container-network/> edit route 10.0.10.0/24
-	admin@example:/config/interface/docker0/container-network/route/10.0.10.0/24/> set gateway 192.168.10.254
-	admin@example:/config/interface/docker0/container-network/route/10.0.10.0/24/> end
-	admin@example:/config/interface/docker0/container-network/> end
-    admin@example:/config/interface/docker0/> leave
+<pre class="cli"><code>admin@example:/config/interface/docker0/> <b>edit container-network</b>
+admin@example:/config/…/container-network/> <b>set type bridge</b>
+admin@example:/config/…/container-network/> <b>edit subnet 192.168.0.0/16</b>
+admin@example:/config/…/subnet/192.168.0.0/16/> <b>set gateway 192.168.255.254</b>
+admin@example:/config/…/subnet/192.168.0.0/16/> <b>end</b>
+admin@example:/config/…/container-network/> <b>edit route 10.0.10.0/24</b>
+admin@example:/config/…/route/10.0.10.0/24/> <b>set gateway 192.168.10.254</b>
+admin@example:/config/…/route/10.0.10.0/24/> <b>end</b>
+admin@example:/config/…/container-network/> <b>end</b>
+admin@example:/config/interface/docker0/> <b>leave</b>
+</code></pre>
 
 Other network settings, like DNS and domain, use built-in defaults, but
 can be overridden from each container.  Other common settings per
@@ -464,24 +631,25 @@ in a `bridge`.  Below an example of a system container calls `set
 network interface docker0`, here we show how to set options for that
 network:
 
-    admin@example:/config/container/ntpd/> edit network interface docker0
-    admin@example:/config/container/ntpd/network/interface/docker0/>
-    admin@example:/config/container/ntpd/network/interface/docker0/> set option
-    <string>  Options for masquerading container bridges.
-    admin@example:/config/container/ntpd/network/interface/docker0/> help option
-    NAME
-            option <string>
-    
-    DESCRIPTION
-            Options for masquerading container bridges.
+<pre class="cli"><code>admin@example:/config/container/ntpd/> <b>edit network interface docker0</b>
+admin@example:/config/…/network/interface/docker0/>
+admin@example:/config/…/network/interface/docker0/> <b>set option</b>
+&lt;string&gt;  Options for masquerading container bridges.
+admin@example:/config/…/network/interface/docker0/> <b>help option</b>
+NAME
+        option &lt;string&gt;
 
-            Example: ip=1.2.3.4            -- request a specific IP (IPv4 or IPv6)
-                     mac=00:01:02:c0:ff:ee -- set fixed MAC address in container
-                     interface_name=foo0   -- set interface name inside container
-    
-    admin@example:/config/container/ntpd/network/interface/docker0/> set option ip=172.17.0.2
-    admin@example:/config/container/ntpd/network/interface/docker0/> set option interface_name=wan
-    admin@example:/config/container/ntpd/network/interface/docker0/> leave
+DESCRIPTION
+        Options for masquerading container bridges.
+
+        Example: ip=1.2.3.4            -- request a specific IP (IPv4 or IPv6)
+                 mac=00:01:02:c0:ff:ee -- set fixed MAC address in container
+                 interface_name=foo0   -- set interface name inside container
+
+admin@example:/config/…/network/interface/docker0/> <b>set option ip=172.17.0.2</b>
+admin@example:/config/…/network/interface/docker0/> <b>set option interface_name=wan</b>
+admin@example:/config/…/network/interface/docker0/> <b>leave</b>
+</code></pre>
 
 
 ### Container Host Interface
@@ -500,6 +668,12 @@ set:
 
 For an example of both, see the next section.
 
+> [!IMPORTANT]
+> **VETH Pair Limitation:** When using VETH pairs with containers, at least
+> one side of the pair must remain in the host namespace. It is currently
+> not possible to create VETH pairs where both ends are assigned to different
+> containers. One end must always be accessible from the host.
+
 [^3]: Something which the container bridge network type does behind the
     scenes with one end of an automatically created VETH pair.
 
@@ -516,14 +690,15 @@ container-end of pair `ntpd`.  This is just a convenience for us when
 reading the configuration later.  The *real action* happens on the last
 line where we declare the `ntpd` end as a container network interface:
 
-    admin@example:/config/> edit interface veth0
-    admin@example:/config/interface/veth0/> set veth peer ntpd
-    admin@example:/config/interface/veth0/> set ipv4 address 192.168.0.1 prefix-length 24
-    admin@example:/config/interface/veth0/> end
-    admin@example:/config/> edit interface ntpd
-    admin@example:/config/interface/ntpd/> set ipv4 address 192.168.0.2 prefix-length 24
-    admin@example:/config/interface/ntpd/> set custom-phys-address static 00:c0:ff:ee:00:01
-    admin@example:/config/interface/ntpd/> set container-network
+<pre class="cli"><code>admin@example:/config/> <b>edit interface veth0</b>
+admin@example:/config/interface/veth0/> <b>set veth peer ntpd</b>
+admin@example:/config/interface/veth0/> <b>set ipv4 address 192.168.0.1 prefix-length 24</b>
+admin@example:/config/interface/veth0/> <b>end</b>
+admin@example:/config/> <b>edit interface ntpd</b>
+admin@example:/config/interface/ntpd/> <b>set ipv4 address 192.168.0.2 prefix-length 24</b>
+admin@example:/config/interface/ntpd/> <b>set custom-phys-address static 00:c0:ff:ee:00:01</b>
+admin@example:/config/interface/ntpd/> <b>set container-network</b>
+</code></pre>
 
 > [!TIP]
 > Notice how you can also set a custom MAC address at the same time.
@@ -532,8 +707,9 @@ Adding the interface to the container is the same as before, but since
 everything for host interfaces is set up in the interfaces context, we
 can take a bit of a shortcut.
 
-    admin@example:/config/container/ntpd/> set network interface ntpd
-    admin@example:/config/container/ntpd/> leave
+<pre class="cli"><code>admin@example:/config/container/ntpd/> <b>set network interface ntpd</b>
+admin@example:/config/container/ntpd/> <b>leave</b>
+</code></pre>
 
 > [!TIP]
 > Use the `set network interface ntpd option interface_name=foo0` to set
@@ -554,9 +730,10 @@ pair to give our container two interfaces:
 
 We start by adding the second VETH pair:
 
-    admin@example:/config/> edit interface veth1a
-    admin@example:/config/interface/veth1a/> set veth peer veth1
-    admin@example:/config/interface/veth1a/> set ipv4 address 192.168.1.2 prefix-length 24
+<pre class="cli"><code>admin@example:/config/> <b>edit interface veth1a</b>
+admin@example:/config/interface/veth1a/> <b>set veth peer veth1</b>
+admin@example:/config/interface/veth1a/> <b>set ipv4 address 192.168.1.2 prefix-length 24</b>
+</code></pre>
 
 > [!NOTE]
 > The LAN bridge (br1) in this example has IP address 192.168.1.1.
@@ -565,20 +742,21 @@ When a container has multiple host interfaces it can often be useful to
 have a default route installed.  This can be added from the host with a
 `0.0.0.0/0` route on one of the interfaces:
 
-    admin@example:/config/interface/veth1a/> set container-network route 0.0.0.0/0 gateway 192.168.1.1
-    admin@example:/config/interface/veth1a/> show
-    type veth;
-	container-network {
-	  type host;
-	  route 0.0.0.0/0 {
-		gateway 192.168.1.1;
-	  }
-	}
-	veth {
-	  peer veth1;
-	}
-    admin@example:/config/interface/veth1a/> end
-    admin@example:/config/> set interface veth1 bridge-port bridge br1
+<pre class="cli"><code>admin@example:/config/interface/veth1a/> <b>set container-network route 0.0.0.0/0 gateway 192.168.1.1</b>
+admin@example:/config/interface/veth1a/> <b>show</b>
+type veth;
+container-network {
+  type host;
+  route 0.0.0.0/0 {
+    gateway 192.168.1.1;
+  }
+}
+veth {
+  peer veth1;
+}
+admin@example:/config/interface/veth1a/> <b>end</b>
+admin@example:/config/> <b>set interface veth1 bridge-port bridge br1</b>
+</code></pre>
 
 Please note, container network routes require the base interface also
 have a static IP address set.  Setting only the route, but no address,
@@ -604,11 +782,12 @@ It is possible to mount files, directories, and even files matching a
 glob, into a container.  This gives precise control over the container's
 file system:
 
-    admin@example:/config/container/system/> edit mount leds
-    admin@example:/config/container/system/mount/leds> set source /sys/class/leds
-    admin@example:/config/container/system/mount/leds> set target /sys/class/leds
-    admin@example:/config/container/system/mount/leds> end
-    admin@example:/config/container/system/>
+<pre class="cli"><code>admin@example:/config/container/system/> <b>edit mount leds</b>
+admin@example:/config/container/system/mount/leds> <b>set source /sys/class/leds</b>
+admin@example:/config/container/system/mount/leds> <b>set target /sys/class/leds</b>
+admin@example:/config/container/system/mount/leds> <b>end</b>
+admin@example:/config/container/system/>
+</code></pre>
 
 Any type of file can be *bind mounted* into the container, just watch
 out for permissions though.  In the example above, `/sys/class/leds` is
@@ -624,7 +803,8 @@ trigger a container restart.
 Other times *volumes* are a better fit.  A volume is an automatically
 created read-writable entity that follows the life of your container.
 
-    admin@example:/config/container/ntpd/> set volume varlib target /var/lib
+<pre class="cli"><code>admin@example:/config/container/ntpd/> <b>set volume varlib target /var/lib</b>
+</code></pre>
 
 Volumes are persistent across both reboots and upgrades of the base
 image.  They are created by Podman when the container first starts up,
@@ -637,6 +817,53 @@ empty: then rsync".
 > volume between containers.  All the tricks possible with volumes may
 > be added in a later release.
 
+### Volume Management
+
+Volumes are persistent storage that survive container restarts and image
+upgrades, making them ideal for application data. However, this also means
+they **are not automatically removed** when a container is deleted from the
+configuration.
+
+This design choice prevents accidental data loss, especially in scenarios
+where:
+
+ - A container is temporarily removed and re-added with the same name
+ - A container is replaced with a different configuration but same name
+ - System upgrades or configuration changes affect container definitions
+
+To clean up unused volumes and reclaim disk space, use the admin-exec
+command:
+
+<pre class="cli"><code>admin@example:/> <b>container prune</b>
+Deleted Images
+...
+Deleted Volumes
+ntpd-varlib
+system-data
+
+Total reclaimed space: 45.2MB
+</code></pre>
+
+The `container prune` command safely removes:
+
+ - Unused container images
+ - Volumes not attached to any container (running or stopped)
+ - Other unused container resources
+
+> [!TIP]
+> You can monitor container resource usage with the command:
+>
+> <pre class="cli"><code>admin@example:/> <b>show container usage</b>
+> </code></pre>
+>
+> This displays disk space used by images, containers, and volumes,
+> helping you decide when to run the prune command.
+>
+> To see which volumes exist and which containers use them:
+>
+> <pre class="cli"><code>admin@example:/> <b>show container volumes</b>
+> </code></pre>
+
 ### Content Mounts
 
 Content mounts are a special type of file mount where the file contents
@@ -645,12 +872,13 @@ when deploying similar systems at multiple sites.  When the host loads
 its `startup-config` (or even `factory-config`) a temporary file is
 created using the decoded base64 data from the `content` node.
 
-    admin@example:/config/container/ntpd/> edit mount ntpd.conf
-    admin@example:/config/container/ntpd/mount/ntpd.conf> text-editor content
-    ... interactive editor starts up ...
-    admin@example:/config/container/ntpd/mount/ntpd.conf> set target /etc/ntpd.conf
-    admin@example:/config/container/ntpd/mount/ntpd.conf> end
-    admin@example:/config/container/ntpd/>
+<pre class="cli"><code>admin@example:/config/container/ntpd/> <b>edit mount ntpd.conf</b>
+admin@example:/config/container/ntpd/mount/ntpd.conf> <b>text-editor content</b>
+... interactive editor starts up ...
+admin@example:/config/container/ntpd/mount/ntpd.conf> <b>set target /etc/ntpd.conf</b>
+admin@example:/config/container/ntpd/mount/ntpd.conf> <b>end</b>
+admin@example:/config/container/ntpd/>
+</code></pre>
 
 The editor is a small [Emacs clone called Mg][2], see the built-in help
 text, or press Ctrl-x Ctrl-c to exit and save.  When the editor exits
@@ -674,12 +902,13 @@ Let's try out what we've learned by setting up a system container, a
 container providing multiple services, using the `docker0` interface
 we created previously:
 
-    admin@example:/> configure
-    admin@example:/config> edit container system
-    admin@example:/config/container/system/> set image ghcr.io/kernelkit/curios:edge
-    admin@example:/config/container/system/> set network interface docker0
-    admin@example:/config/container/system/> set publish 222:22
-    admin@example:/config/container/system/> leave
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config> <b>edit container system</b>
+admin@example:/config/container/system/> <b>set image ghcr.io/kernelkit/curios:edge</b>
+admin@example:/config/container/system/> <b>set network interface docker0</b>
+admin@example:/config/container/system/> <b>set publish 222:22</b>
+admin@example:/config/container/system/> <b>leave</b>
+</code></pre>
 
 > [!NOTE]
 > Ensure you have a network connection to the registry.  If the image
@@ -694,26 +923,29 @@ container configuration context for the full syntax.)
 
 Available containers can be accessed from admin-exec:
 
-    admin@example:/> show container
-    CONTAINER ID  IMAGE                          COMMAND     CREATED       STATUS       PORTS                 NAMES
-    439af2917b44  ghcr.io/kernelkit/curios:edge              41 hours ago  Up 16 hours  0.0.0.0:222->222/tcp  system
+<pre class="cli"><code>admin@example:/> <b>show container</b>
+<span class="header">NAME     STATUS        NETWORK  MEMORY (KiB)  CPU%</span>
+system   Up 16 hours   docker0       136/512  0.02
+</code></pre>
 
 This is a system container, so you can "attach" to it by starting a
 shell (or logging in with SSH):
 
-    admin@example:/> container shell system
-    root@439af2917b44:/#
+<pre class="cli"><code>admin@example:/> <b>container shell system</b>
+root@439af2917b44:/#
+</code></pre>
 
 Notice how the hostname inside the container changes.  By default the
 container ID (hash) is used, but this can be easily changed:
 
-    root@439af2917b44:/# exit
-    admin@example:/> configure
-    admin@example:/config/> edit container system
-    admin@example:/config/container/system/> set hostname sys101
-    admin@example:/config/container/system/> leave
-    admin@example:/> container shell system
-    root@sys101:/#
+<pre class="cli"><code>root@439af2917b44:/# <b>exit</b>
+admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit container system</b>
+admin@example:/config/container/system/> <b>set hostname sys101</b>
+admin@example:/config/container/system/> <b>leave</b>
+admin@example:/> <b>container shell system</b>
+root@sys101:/#
+</code></pre>
 
 In fact, the container `hostname` setting supports the same format
 specifiers as the host's `hostname` setting:
@@ -738,16 +970,17 @@ Infix currently does not have a native firewall configuration, and even
 when it does it will never expose the full capabilities of `nftables`.
 For advanced setups, the following is an interesting alternative.
 
-    admin@example:/> configure
-    admin@example:/config> edit container nftables
-    admin@example:/config/container/nftables/> set image ghcr.io/kernelkit/curios-nftables:edge
-    admin@example:/config/container/nftables/> set network host
-    admin@example:/config/container/nftables/> set privileged
-    admin@example:/config/container/nftables/> edit mount nftables.conf
-    admin@example:/config/container/nftables/mount/nftables.conf/> set target /etc/nftables.conf
-    admin@example:/config/container/nftables/mount/nftables.conf/> text-editor content
-    ... interactive editor starts up where you can paste your rules ...
-    admin@example:/config/container/nftables/mount/nftables.conf/> leave
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config> <b>edit container nftables</b>
+admin@example:/config/container/nftables/> <b>set image ghcr.io/kernelkit/curios-nftables:edge</b>
+admin@example:/config/container/nftables/> <b>set network host</b>
+admin@example:/config/container/nftables/> <b>set privileged</b>
+admin@example:/config/container/nftables/> <b>edit mount nftables.conf</b>
+admin@example:/config/…/mount/nftables.conf/> <b>set target /etc/nftables.conf</b>
+admin@example:/config/…/mount/nftables.conf/> <b>text-editor content</b>
+... interactive editor starts up where you can paste your rules ...
+admin@example:/config/…/mount/nftables.conf/> <b>leave</b>
+</code></pre>
 
 Notice how we `set network host`, so the container can see and act on
 all the host's interfaces, and that we also have to run the container
@@ -766,19 +999,20 @@ file system and store in the host's `startup-config`.  However, `ntpd`
 also saves clock drift information in `/var/lib/ntpd`, so we will also
 use volumes in this example.
 
-    admin@example:/> configure
-    admin@example:/config> edit container ntpd
-    admin@example:/config/container/ntpd/> set image ghcr.io/kernelkit/curios-ntpd:edge
-    admin@example:/config/container/ntpd/> set network interface ntpd    # From veth0 above
-    admin@example:/config/container/ntpd/> edit mount ntp.conf
-    admin@example:/config/container/ntpd/mount/ntp.conf/> set target /etc/ntp.conf
-    admin@example:/config/container/ntpd/mount/ntp.conf/> text-editor content
-    ... interactive editor starts up where you can paste your rules ...
-    admin@example:/config/container/ntpd/mount/ntp.conf/> end
-    admin@example:/config/container/ntpd/> edit volume varlib
-    admin@example:/config/container/ntpd/volume/varlib/> set target /var/lib
-    admin@example:/config/container/ntpd/volume/varlib/> leave
-    admin@example:/> copy running-config startup-config
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config> <b>edit container ntpd</b>
+admin@example:/config/container/ntpd/> <b>set image ghcr.io/kernelkit/curios-ntpd:edge</b>
+admin@example:/config/container/ntpd/> <b>set network interface ntpd</b>    # From veth0 above
+admin@example:/config/container/ntpd/> <b>edit mount ntp.conf</b>
+admin@example:/config/container/ntpd/mount/ntp.conf/> <b>set target /etc/ntp.conf</b>
+admin@example:/config/container/ntpd/mount/ntp.conf/> <b>text-editor content</b>
+... interactive editor starts up where you can paste your rules ...
+admin@example:/config/container/ntpd/mount/ntp.conf/> <b>end</b>
+admin@example:/config/container/ntpd/> <b>edit volume varlib</b>
+admin@example:/config/container/ntpd/volume/varlib/> <b>set target /var/lib</b>
+admin@example:/config/container/ntpd/volume/varlib/> <b>leave</b>
+admin@example:/> <b>copy running-config startup-config</b>
+</code></pre>
 
 The `ntp.conf` file is stored in the host's `startup-config` and any
 state data in the container's `/var/lib` is retained between reboots
@@ -813,25 +1047,28 @@ First, enable *Privileged* mode, this unlocks the door and allows the
 container to manage resources on the host system.  An example is the
 `nftables` container mentioned previously.
 
-    admin@example:/config/container/system/> set privileged
+<pre class="cli"><code>admin@example:/config/container/system/> <b>set privileged</b>
+</code></pre>
 
 Second, mount the host's `/proc/1` directory to somewhere inside your
 container.  Here we pick `/1`:
 
-	admin@example:/config/container/system/> edit mount host
-	admin@example:/config/container/system/mount/host/> set source /proc/1
-	admin@example:/config/container/system/mount/host/> set target /1
-	admin@example:/config/container/system/mount/host/> leave
+<pre class="cli"><code>admin@example:/config/container/system/> <b>edit mount host</b>
+admin@example:/config/container/system/mount/host/> <b>set source /proc/1</b>
+admin@example:/config/container/system/mount/host/> <b>set target /1</b>
+admin@example:/config/container/system/mount/host/> <b>leave</b>
+</code></pre>
 
 Third, from inside the container, use the host's PID 1 namespaces with
 the `nsenter`[^2] command to slide through the container's walls.  Here
 we show two example calls to `hostname`, first the container's own name
 and then asking what the hostname is on the host:
 
-	root@sys101:/# hostname
-	sys101
-    root@sys101:/# nsenter -m/1/ns/mnt -u/1/ns/uts -i/1/ns/ipc -n/1/ns/net hostname
-	example
+<pre class="cli"><code>root@sys101:/# <b>hostname</b>
+sys101
+root@sys101:/# <b>nsenter -m/1/ns/mnt -u/1/ns/uts -i/1/ns/ipc -n/1/ns/net hostname</b>
+example
+</code></pre>
 
 One use-case for this method is when extending Infix with a management
 container that connects to other systems.  For some tips on how to
@@ -891,8 +1128,7 @@ tarballs with SHA256 checksums for integrity checking.
 
 Finally, if you build your own version of Infix, and embed OCI tarballs
 in the system image, then see the tip at the end of [Upgrading a
-Container Image](#upgrading-a-container-image) (above).
-
+Container Image](#embedded-container-images) (above).
 
 [0]:      networking.md
 [1]:      https://github.com/kernelkit/infix/blob/main/src/confd/yang/infix-containers.yang

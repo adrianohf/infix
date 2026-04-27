@@ -4,13 +4,13 @@
 #
 ################################################################################
 
-CONFD_VERSION = 1.5
+CONFD_VERSION = 1.8
 CONFD_SITE_METHOD = local
 CONFD_SITE = $(BR2_EXTERNAL_INFIX_PATH)/src/confd
 CONFD_LICENSE = BSD-3-Clause
 CONFD_LICENSE_FILES = LICENSE
 CONFD_REDISTRIBUTE = NO
-CONFD_DEPENDENCIES = host-sysrepo sysrepo netopeer2 jansson libite sysrepo libsrx libglib2
+CONFD_DEPENDENCIES = host-sysrepo sysrepo rousette netopeer2 jansson libite sysrepo libsrx libglib2 libev
 CONFD_AUTORECONF = YES
 CONFD_CONF_OPTS += --disable-silent-rules --with-crypt=$(BR2_PACKAGE_CONFD_DEFAULT_CRYPT)
 CONFD_SYSREPO_SHM_PREFIX = sr_buildroot$(subst /,_,$(CONFIG_DIR))_confd
@@ -25,6 +25,16 @@ else
 CONFD_CONF_OPTS += --disable-containers
 endif
 
+ifeq ($(BR2_PACKAGE_FEATURE_WIFI),y)
+CONFD_CONF_OPTS += --enable-wifi
+else
+CONFD_CONF_OPTS += --disable-wifi
+endif
+ifeq ($(BR2_PACKAGE_FEATURE_GPS),y)
+CONFD_CONF_OPTS += --enable-gps
+else
+CONFD_CONF_OPTS += --disable-gps
+endif
 define CONFD_INSTALL_EXTRA
 	for fn in confd.conf resolvconf.conf; do \
 		cp $(CONFD_PKGDIR)/$$fn  $(FINIT_D)/available/; \
@@ -32,7 +42,7 @@ define CONFD_INSTALL_EXTRA
 	done
 	cp $(CONFD_PKGDIR)/tmpfiles.conf $(TARGET_DIR)/etc/tmpfiles.d/confd.conf
 	mkdir -p $(TARGET_DIR)/etc/avahi/services
-	cp $(CONFD_PKGDIR)/avahi.service $(TARGET_DIR)/etc/avahi/services/netconf.service
+	cp $(CONFD_PKGDIR)/netconf.service $(TARGET_DIR)/etc/avahi/services/
 endef
 
 NETOPEER2_SEARCHPATH=$(TARGET_DIR)/usr/share/yang/modules/netopeer2/
@@ -69,6 +79,18 @@ define CONFD_INSTALL_YANG_MODULES_CONTAINERS
 	$(BR2_EXTERNAL_INFIX_PATH)/utils/srload $(@D)/yang/containers.inc
 endef
 endif
+ifeq ($(BR2_PACKAGE_FEATURE_WIFI),y)
+define CONFD_INSTALL_YANG_MODULES_WIFI
+	$(COMMON_SYSREPO_ENV) \
+	$(BR2_EXTERNAL_INFIX_PATH)/utils/srload $(@D)/yang/wifi.inc
+endef
+endif
+ifeq ($(BR2_PACKAGE_FEATURE_GPS),y)
+define CONFD_INSTALL_YANG_MODULES_GPS
+	$(COMMON_SYSREPO_ENV) \
+	$(BR2_EXTERNAL_INFIX_PATH)/utils/srload $(@D)/yang/gps.inc
+endef
+endif
 
 # PER_PACKAGE_DIR
 # Since the last package in the dependency chain that runs sysrepoctl is confd, we need to
@@ -97,6 +119,8 @@ CONFD_PRE_BUILD_HOOKS += CONFD_CLEANUP
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_EXTRA
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_CONTAINERS
+CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_WIFI
+CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_GPS
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_IN_ROMFS
 CONFD_TARGET_FINALIZE_HOOKS += CONFD_CLEANUP
 

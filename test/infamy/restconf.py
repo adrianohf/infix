@@ -26,16 +26,14 @@ class Location:
 
 def xpath_to_uri(xpath, extra=None):
     """Convert xpath to HTTP URI"""
-    # If the xpath has a
     pattern = r'\[(.*?)=["\'](.*?)["\']\]'
     matches = re.findall(pattern, xpath)
 
+    uri_path = xpath
     if matches:
         for key, value in matches:
             # replace [key=value] with =value
-            uri_path = re.sub(rf'\[{re.escape(key)}=["\']{re.escape(value)}["\']\]', f'={value}', xpath)
-    else:
-        uri_path = xpath
+            uri_path = re.sub(rf'\[{re.escape(key)}=["\']{re.escape(value)}["\']\]', f'={value}', uri_path)
 
     # Append extra if provided
     if extra is not None:
@@ -53,8 +51,8 @@ def requests_workaround(method, url, json, headers, auth, verify=False, retry=0)
     request = requests.Request(method, url, json=json, headers=headers,
                                auth=auth)
     prepared_request = session.prepare_request(request)
-    prepared_request.url = prepared_request.url.replace('%25', '%')
-    prepared_request.url = prepared_request.url.replace('%3A', ':')
+    prepared_request.url = re.sub(r'%25', '%', prepared_request.url)
+    prepared_request.url = re.sub(r'%3a', ':', prepared_request.url, flags=re.IGNORECASE)
     response = session.send(prepared_request, verify=verify)
     try:
         # Raise exceptions for HTTP errors
@@ -85,6 +83,10 @@ def requests_workaround_post(url, json, headers, auth, verify=False):
     return requests_workaround('POST', url, json, headers, auth, verify=False)
 
 
+def requests_workaround_patch(url, json, headers, auth, verify=False):
+    return requests_workaround('PATCH', url, json, headers, auth, verify=False)
+
+
 def requests_workaround_get(url, headers, auth, verify=False):
     return requests_workaround('GET', url, None, headers, auth, verify=False)
 
@@ -101,7 +103,6 @@ def restconf_reachable(neigh, password):
         response = requests_workaround_get(url, headers=headers, auth=auth,
                                            verify=False)
         if response.status_code == 200:
-            print(f"{neigh} answers to TCP connections on port 443 (RESTCONF)")
             return True
     except:
         return False
@@ -151,7 +152,6 @@ class Device(Transport):
         url = f"{self.yang_url}/{schema_name}"
         data = self._get_raw(url=url, parse=False)
 
-        sys.stdout.write(f"Downloading YANG model {schema_name} ...\r\033[K")
         data = data.decode('utf-8')
         with open(f"{yangdir}/{schema_name}", 'w') as json_file:
             json_file.write(data)
@@ -205,7 +205,7 @@ class Device(Transport):
     def get_datastore(self, datastore="operational", path="", parse=True):
         """Get a datastore"""
         dspath = f"/ds/ietf-datastores:{datastore}"
-        if path is not None:
+        if path is not None and path != "":
             dspath = f"{dspath}{path}"
 
         url = f"{self.restconf_url}{dspath}"
@@ -256,55 +256,209 @@ class Device(Transport):
         # Raise exceptions for HTTP errors
         response.raise_for_status()
 
-    def get_config_dict(self, modname):
-        """Get all configuration for module @modname as dictionary"""
-        ds = self.get_running(modname)
+    def get_config_dict(self, xpath):
+        """Get all configuration matching @xpath as dictionary"""
+        # Strip leading slash if present (for compatibility with NETCONF xpath style)
+        xpath = xpath.lstrip('/')
+
+        # Get the whole module's configuration by requesting the module root
+        # The xpath parameter might be in format "module:container" or just "module"
+        if ":" in xpath:
+            model, container = xpath.split(":", 1)  # Split only on first colon
+            path = f"/{model}:{container}"  # This creates something like /ietf-syslog:syslog
+        else:
+            # If no colon, assume the whole thing is the module name
+            model = xpath
+            path = f"/{model}"  # This creates something like /ietf-syslog
+
+        ds = self.get_running(path)
+        if ds is None:
+            return None
         ds = json.loads(ds.print_mem("json", with_siblings=True, pretty=False))
-        model, container = modname.split(":")
-        for k, v in ds.items():
-            return {container: v}
+        # If we have module:container format, extract the container part from the result
+        if ":" in xpath:
+            _, container = xpath.split(":", 1)
+            for k, v in ds.items():
+                return {container: v}
+        else:
+            # Return the whole result if no specific container was specified
+            return ds
 
-    def put_config_dicts(self, models):
-        """PUT full configuration of all models to running-config"""
+    def put_config_dicts(self, models, retries=3):
+        """PATCH configuration of all models to running-config
+
+        Uses candidate datastore + copy to running to trigger sysrepo
+        change callbacks, similar to how NETCONF edit-config + commit works.
+
+        Args:
+            models:  Dictionary of models to configure
+            retries: Number of retry attempts on failure (default 3)
+        """
         infer_put_dict(self.name, models)
-        running = self.get_running()
 
-        for model in models.keys():
-            mod = self.lyctx.get_module(model)
-            lyd = mod.parse_data_dict(models[model], no_state=True, validate=False)
-            running.merge(lyd)
+        # Copy running to candidate first (to preserve existing config)
+        self.copy("running", "candidate")
 
-        cfg = running.print_mem("json", with_siblings=True, pretty=True)
-        # print(f"PUT new running-config: {cfg}")
-        return self.put_datastore("running", json.loads(cfg))
+        # PATCH each model to candidate datastore
+        for model, config in models.items():
+            try:
+                mod = self.lyctx.get_module(model)
+            except libyang.util.LibyangError:
+                raise Exception(f"YANG model '{model}' not found on device. "
+                               f"Model may not be installed or enabled. "
+                               f"Available models can be checked with get_schema_list()") from None
 
-    def put_config_dict(self, modname, edit):
-        """Add @edit to running config and put the whole configuration"""
+            # Parse and convert to get proper structure with module prefix
+            lyd = mod.parse_data_dict(config, no_state=True, validate=False)
+            patch_data = json.loads(lyd.print_mem("json", with_siblings=True, pretty=False))
 
-        # This is hacky, refactor when rousette have PATCH support.
-        running = self.get_running()
-        mod = self.lyctx.get_module(modname)
+            # PATCH to candidate datastore
+            url = f"{self.restconf_url}/ds/ietf-datastores:candidate"
 
-        for k, _ in edit.items():
-            module = modname + ":" + k
-            break
+            last_error = None
+            for attempt in range(0, retries):
+                try:
+                    response = requests_workaround_patch(
+                        url,
+                        json=patch_data,
+                        headers=self.headers,
+                        auth=self.auth,
+                        verify=False
+                    )
+                    response.raise_for_status()
+                    last_error = None
+                    break
+                except Exception as e:
+                    last_error = e
+                    if attempt < retries - 1:
+                        print(f"Failed PATCH to {url}: {e}  Retrying ...")
+                        time.sleep(1)
+                    else:
+                        print(f"Failed PATCH to {url}: {e}")
+                    continue
 
-        # Ugly hack, but this function should be refactored when patch
-        # is available in rousette anyway.
-        rundict = json.loads(running.print_mem("json", with_siblings=True,
-                                               pretty=False))
-        if rundict.get(module) is None:
-            rundict[module] = {}
-            running = self.lyctx.parse_data_mem(json.dumps(rundict), "json",
-                                                parse_only=True)
+            if last_error is not None:
+                raise last_error
 
-        change = mod.parse_data_dict(edit, no_state=True, validate=False)
-        running.merge_module(change)
-        cfg = running.print_mem("json", with_siblings=True, pretty=False)
-        # print(f"PUT new running-config: {cfg}")
-        data = json.loads(cfg)
+        # Copy candidate to running (acts as "commit", triggers sysrepo callbacks)
+        self.copy("candidate", "running")
 
-        return self.put_datastore("running", data)
+    def put_config_dict(self, xpath, edit, retries=3):
+        """PATCH configuration for a single model to running-config
+
+        Uses candidate datastore + copy to running to trigger sysrepo
+        change callbacks, similar to how NETCONF edit-config + commit works.
+
+        Args:
+            xpath:   YANG module name
+            edit:    Configuration dictionary
+            retries: Number of retry attempts on failure (default 3)
+        """
+        try:
+            mod = self.lyctx.get_module(xpath)
+        except libyang.util.LibyangError:
+            raise Exception(f"YANG model '{xpath}' not found on device. "
+                            f"Model may not be installed or enabled. "
+                            f"Available models can be checked with get_schema_list()") from None
+
+        # Copy running to candidate first (to preserve existing config)
+        self.copy("running", "candidate")
+
+        # Parse and convert to get proper structure with module prefix
+        lyd = mod.parse_data_dict(edit, no_state=True, validate=False)
+        patch_data = json.loads(lyd.print_mem("json", with_siblings=True, pretty=False))
+
+        # PATCH to candidate datastore
+        url = f"{self.restconf_url}/ds/ietf-datastores:candidate"
+        last_error = None
+        for attempt in range(0, retries):
+            try:
+                response = requests_workaround_patch(
+                    url,
+                    json=patch_data,
+                    headers=self.headers,
+                    auth=self.auth,
+                    verify=False
+                )
+                response.raise_for_status()
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < retries - 1:
+                    print(f"Failed PATCH to {url}: {e}  Retrying ...")
+                    time.sleep(1)
+                else:
+                    print(f"Failed PATCH to {url}: {e}")
+                continue
+
+        if last_error is not None:
+            raise last_error
+
+        # Copy candidate to running (acts as "commit", triggers sysrepo callbacks)
+        self.copy("candidate", "running")
+
+    def patch_config(self, xpath, edit, retries=3):
+        """PATCH configuration directly to running datastore
+
+        This bypasses the candidate datastore, avoiding full datastore
+        copy operations. Useful for NACM-restricted users who only have
+        access to specific paths. Note: may not trigger sysrepo callbacks
+        for all configuration types.
+
+        Args:
+            xpath:   YANG module name
+            edit:    Configuration dictionary
+            retries: Number of retry attempts on failure (default 3)
+        """
+        try:
+            mod = self.lyctx.get_module(xpath)
+        except libyang.util.LibyangError:
+            raise Exception(f"YANG model '{xpath}' not found on device. "
+                           f"Model may not be installed or enabled. "
+                           f"Available models can be checked with get_schema_list()") from None
+
+        # Parse and convert to get proper structure with module prefix
+        lyd = mod.parse_data_dict(edit, no_state=True, validate=False)
+        patch_data = json.loads(lyd.print_mem("json", with_siblings=True, pretty=False))
+
+        # PATCH directly to running datastore
+        url = f"{self.restconf_url}/ds/ietf-datastores:running"
+        last_error = None
+        for attempt in range(0, retries):
+            try:
+                response = requests_workaround_patch(
+                    url,
+                    json=patch_data,
+                    headers=self.headers,
+                    auth=self.auth,
+                    verify=False
+                )
+                response.raise_for_status()
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                # Try to extract detailed error message from response
+                error_detail = str(e)
+                if hasattr(e, 'response') and e.response is not None:
+                    try:
+                        err_json = e.response.json()
+                        if 'ietf-restconf:errors' in err_json:
+                            errors = err_json['ietf-restconf:errors'].get('error', [])
+                            if errors:
+                                error_detail = errors[0].get('error-message', str(e))
+                    except:
+                        pass
+                if attempt < retries - 1:
+                    print(f"Failed PATCH: {error_detail}  Retrying ...")
+                    time.sleep(1)
+                else:
+                    print(f"Failed PATCH: {error_detail}")
+                continue
+
+        if last_error is not None:
+            raise last_error
 
     def call_dict(self, model, call):
         pass # Need implementation
@@ -335,10 +489,20 @@ class Device(Transport):
 
         return data
 
-    def copy(self, source, target):
+    def copy(self, source, target, retries=3):
         factory = self.get_datastore(source)
         data = factory.print_mem("json", with_siblings=True, pretty=False)
-        self.put_datastore(target, json.loads(data))
+        last_error = None
+        for attempt in range(0, retries):
+            try:
+                self.put_datastore(target, json.loads(data))
+                return
+            except requests.exceptions.ConnectionError as e:
+                last_error = e
+                if attempt < retries - 1:
+                    print(f"Failed copy {source}->{target}: {e}  Retrying ...")
+                    time.sleep(1)
+        raise last_error
 
     def reboot(self):
         self.call_rpc("ietf-system:system-restart")

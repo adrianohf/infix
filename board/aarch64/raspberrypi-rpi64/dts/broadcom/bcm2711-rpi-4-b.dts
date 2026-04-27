@@ -1,0 +1,20 @@
+#include <arm64/broadcom/bcm2711-rpi-4-b.dts>
+#include "infix.dtsi"
+
+/ {
+	chosen {
+		/* 8250 auxiliary UART instead of pl011 */
+		stdout-path = "serial1:115200n8";
+	};
+};
+
+/* Override upstream 64MB CMA with 256MB for vc4 GPU */
+&rmem {
+	cma: linux,cma {
+		size = <0x10000000>; /* 256MB */
+	};
+};
+
+&vc4 {
+	status = "okay";
+};

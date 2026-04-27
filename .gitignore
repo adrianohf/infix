@@ -1,5 +1,8 @@
 *~
+.claude
 .gdb_history
+.claude
+AGENTS.md
 /.backup
 /.ccache
 /dl

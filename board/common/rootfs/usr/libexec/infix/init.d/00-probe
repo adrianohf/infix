@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 
-import importlib.machinery
 import json
+import onieprom
 import os
 import shutil
 import struct
 import subprocess
 import sys
 
-onieprom = importlib.machinery.SourceFileLoader("onieprom", "/bin/onieprom").load_module()
 SYSTEM_JSON = "/run/system.json"
 KKIT_IANA_PEM = 61046
 
@@ -98,13 +97,45 @@ class DTSystem:
         data = dict(zip(names, phs))
         if data != {}:
             out["usb-ports"] = []
+
+        name_counts = {}  # Track how many times each name has been used
+
         for name, ph in data.items():
-            [out["usb-ports"].extend([{
-                "name": name,
-                "path": dev.attrpath("authorized")}, {
-                    "name": name,
-                    "path": dev.attrpath("authorized_default")
-                }]) for dev in self.devices_from_ph(ph)]
+            for dev in self.devices_from_ph(ph):
+                # Filter to only USB bus devices (usbN) that have authorized_default
+                # This avoids duplicate entries for platform devices and hub interfaces
+                if not dev.hasattr("authorized_default"):
+                    continue
+
+                # Convert platform path to /sys/bus/usb/devices/usbN path
+                # by finding the matching symlink in /sys/bus/usb/devices/
+                usb_path = dev.syspath
+                try:
+                    real_device = os.path.realpath(dev.syspath)
+                    usb_bus_dir = "/sys/bus/usb/devices"
+                    if os.path.exists(usb_bus_dir):
+                        for entry in os.listdir(usb_bus_dir):
+                            if not entry.startswith("usb"):
+                                continue
+                            candidate = os.path.join(usb_bus_dir, entry)
+                            if os.path.realpath(candidate) == real_device:
+                                usb_path = candidate
+                                break
+                except:
+                    pass  # Fall back to original path if resolution fails
+
+                # Handle name deduplication: first use gets bare name, subsequent get numbers
+                if name not in name_counts:
+                    name_counts[name] = 1
+                    final_name = name
+                else:
+                    name_counts[name] += 1
+                    final_name = f"{name}{name_counts[name]}"
+
+                out["usb-ports"].append({
+                    "name": final_name,
+                    "path": usb_path
+                })
 
     def infix_devices(self, kind):
         phs = self.__get_phandle_array(kind)
@@ -113,6 +144,87 @@ class DTSystem:
     def infix_vpds(self):
         flat_devices = [device for sublist in self.infix_devices("vpds") for device in sublist]
         return [self.into_vpd(device) for device in flat_devices]
+
+    def vendor_name(self):
+        """Extract vendor name from devicetree compatible property"""
+        compatible = self.base.str_array("compatible")
+        if not compatible or len(compatible) == 0:
+            return None
+
+        # Map of common devicetree vendor prefixes to proper names
+        vendor_map = {
+            "raspberrypi": "Raspberry Pi Foundation",
+            "brcm": "Broadcom Inc.",
+            "marvell": "Marvell Technology, Inc.",
+            "fsl": "NXP Semiconductors N.V.",
+            "nxp": "NXP Semiconductors N.V.",
+            "ti": "Texas Instruments Inc.",
+            "qcom": "Qualcomm Inc.",
+            "rockchip": "Rockchip Electronics Co., Ltd.",
+            "amlogic": "Amlogic Inc.",
+            "allwinner": "Allwinner Technology Co., Ltd.",
+            "mediatek": "MediaTek Inc.",
+            "st": "STMicroelectronics N.V.",
+            "xlnx": "Xilinx, Inc.",
+            "intel": "Intel Corporation",
+            "amd": "Advanced Micro Devices, Inc.",
+            "nvidia": "NVIDIA Corporation",
+            "bananapi": "SinoVoip Co., Ltd.",
+            "sinovoip": "SinoVoip Co., Ltd.",
+            "friendlyarm": "FriendlyElec",
+            "friendlyelec": "FriendlyElec",
+            "microchip": "Microchip Technology Inc.",
+            "atmel": "Microchip Technology Inc.",
+        }
+
+        # Get the first (most specific) compatible string
+        compat = compatible[0]
+
+        # Extract vendor prefix (part before comma)
+        if ',' in compat:
+            prefix = compat.split(',')[0].lower()
+            # Return mapped name or capitalized prefix
+            return vendor_map.get(prefix, prefix.capitalize())
+
+        return None
+
+
+class DMISystem:
+    BASE = "/sys/class/dmi/id"
+
+    def read_dmi(self, attr):
+        """Read DMI attribute from /sys/class/dmi/id/"""
+        path = os.path.join(DMISystem.BASE, attr)
+        if not os.path.exists(path):
+            return None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                value = f.read().strip()
+                return value if value else None
+        except:
+            return None
+
+    def populate(self, out):
+        """Read DMI/SMBIOS data and populate output dictionary"""
+        vendor = self.read_dmi("sys_vendor")
+        if vendor:
+            out["vendor"] = vendor
+
+        product_name = self.read_dmi("product_name")
+        if product_name:
+            out["product-name"] = product_name
+
+        serial = self.read_dmi("product_serial")
+        if serial:
+            out["serial-number"] = serial
+
+        version = self.read_dmi("product_version")
+        if version:
+            out["product-version"] = version
+
+    def vpds(self):
+        """DMI systems don't have VPD in the traditional sense"""
+        return []
 
 
 class QEMUSystem:
@@ -140,20 +252,13 @@ class QEMUSystem:
         return [self.product_vpd()]
 
     def usb_ports(self):
-        ports = [
-            {
-                "name": "USB",
-                "path": "/sys/bus/usb/devices/usb1/authorized"
-            }, {
-                "name": "USB",
-                "path": "/sys/bus/usb/devices/usb1/authorized_default"
-            }, {
-                "name": "USB2",
-                "path": "/sys/bus/usb/devices/usb2/authorized"
-            }, {
-                "name": "USB2",
-                "path": "/sys/bus/usb/devices/usb2/authorized_default"
-            }]
+        ports = [{
+            "name": "USB1",
+            "path": "/sys/bus/usb/devices/usb1"
+        }, {
+            "name": "USB2",
+            "path": "/sys/bus/usb/devices/usb2"
+        }]
         return ports
 
 
@@ -252,26 +357,41 @@ def vpd_inject(out, vpds):
             break
 
 
-def qemu_base_mac():
-    """Find MAC address of first non-loopback interface, subtract with 1"""
+def fallback_base_mac():
+    """Find lowest valid MAC address from all interfaces."""
     base_path = '/sys/class/net'
-    interfaces = []
+    macs = []
 
     for iface in os.listdir(base_path):
-        if iface == 'lo':
-            continue
         try:
-            # pylint: disable=invalid-name
             fn = os.path.join(base_path, iface, 'address')
             with open(fn, 'r', encoding='ascii') as f:
                 mac = f.read().strip()
-            interfaces.append((mac, iface))
-        except FileNotFoundError:
+
+            # Skip invalid/empty/unset MAC addresses
+            if not mac or len(mac) < 17 or mac == '00:00:00:00:00:00':
+                continue
+
+            # Validate MAC address format
+            parts = mac.split(':')
+            if len(parts) != 6:
+                continue
+
+            macs.append(mac)
+        except (FileNotFoundError, ValueError):
             continue
 
-    if interfaces:
-        interfaces.sort()
-        mac  = interfaces[0][0]
+    if macs:
+        macs.sort()
+        return macs[0]
+
+    return None
+
+
+def qemu_base_mac():
+    """Find MAC address of first non-loopback interface, subtract with 1"""
+    mac = fallback_base_mac()
+    if mac:
         mac  = int(mac.replace(':', ''), 16)
         mac -= 1
         mac %= 1 << 48
@@ -298,6 +418,9 @@ def probe_qemusystem(out):
         if not out[attr]:
             out[attr] = default
 
+    if os.path.exists(DMISystem.BASE):
+        DMISystem().populate(out)
+
     if not out["factory-password-hash"] and \
        not out["vpd"]["product"]["available"]:
         # Virtual instance without VPD emulation, fallback to
@@ -309,29 +432,199 @@ def probe_qemusystem(out):
     return 0
 
 
+def generic_usb_ports(out):
+    """Generic USB port discovery - works for all systems.
+
+    Each root hub gets its own uniquely-named entry so it can be independently
+    enabled or disabled.  Boards that need explicit per-port control (e.g. to
+    exclude internal buses) should annotate their DT with usb-ports /
+    usb-port-names in the chosen/infix node instead.
+    """
+    ports = []
+    usb_base = "/sys/bus/usb/devices"
+
+    if not os.path.exists(usb_base):
+        return
+
+    for entry in sorted(os.listdir(usb_base)):
+        if not entry.startswith("usb"):
+            continue
+        device_path = os.path.join(usb_base, entry)
+        if not os.path.exists(os.path.join(device_path, "authorized")):
+            continue
+        num = entry.replace("usb", "")
+        ports.append({"num": num, "path": device_path})
+
+    if not ports:
+        return
+
+    # Single bus → "USB"; multiple → "USB1", "USB2", ... (by bus number)
+    if len(ports) == 1:
+        out["usb-ports"] = [{"name": "USB", "path": ports[0]["path"]}]
+    else:
+        out["usb-ports"] = [{"name": f"USB{p['num']}", "path": p["path"]} for p in ports]
+
+
+def probe_dmisystem(out):
+    """Probe DMI/SMBIOS based system (x86/AMD64)"""
+    dmisys = DMISystem()
+
+    dmisys.populate(out)
+    generic_usb_ports(out)
+
+    if not out["mac-address"]:
+        out["mac-address"] = fallback_base_mac()
+
+    vpd_inject(out, dmisys.vpds())
+
+    return 0
+
+
 def probe_dtsystem(out):
     """Probe DTS based system, expects a VPD in ONIE PROM format."""
     dtsys = DTSystem()
     vpds = dtsys.infix_vpds()
-    dtsys.infix_usb_devices(out)
+
     model = dtsys.base.str("model")
     if model:
         out["product-name"] = model
 
+    # Try devicetree-based USB discovery first, fallback to generic
+    dtsys.infix_usb_devices(out)
+    if "usb-ports" not in out or not out["usb-ports"]:
+        generic_usb_ports(out)
+
     out["compatible"] = dtsys.base.str_array("compatible")
+
+    # Extract vendor from compatible string if not already set
+    if not out["vendor"]:
+        vendor = dtsys.vendor_name()
+        if vendor:
+            out["vendor"] = vendor
 
     staticpw = dtsys.infix.str("factory-password-hash")
     if not out["factory-password-hash"]:
         out["factory-password-hash"] = staticpw
 
     vpd_inject(out, vpds)
+
+    # Fallback to devicetree serial-number if VPD doesn't provide one
+    if not out["serial-number"]:
+        serial = dtsys.base.str("serial-number")
+        if serial:
+            out["serial-number"] = serial
+
+    # Fallback to interface MAC if VPD doesn't provide one (e.g., SBCs)
+    if not out["mac-address"]:
+        out["mac-address"] = fallback_base_mac()
+
     return 0
+
+
+def probe_wifi_radios(out):
+    """Probe wifi radios via sysfs/iw and store in output dict."""
+    # feature-wifi is the only Buildroot package that enables CONFIG_MAC80211/
+    # CONFIG_CFG80211, so this directory exists iff WiFi support is built in.
+    # feature-wifi also selects BR2_PACKAGE_IW, so iw(8) is always available
+    # when this directory exists -- no separate iw check needed.
+    ieee80211 = "/sys/class/ieee80211"
+    if not os.path.exists(ieee80211):
+        return
+
+    radios = sorted(os.listdir(ieee80211))
+    if not radios:
+        return
+
+    out["wifi-radios"] = []
+    for phy in radios:
+        info = {"name": phy, "bands": []}
+        try:
+            result = subprocess.run(
+                ["iw", "phy", phy, "info"],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                continue
+        except Exception:
+            continue
+
+        freqs = []
+        for line in result.stdout.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("* ") and "MHz" in stripped:
+                try:
+                    freqs.append(int(float(stripped.split()[1])))
+                except (ValueError, IndexError):
+                    pass
+
+        if any(2400 <= f <= 2500 for f in freqs):
+            info["bands"].append({"name": "2.4GHz"})
+        if any(5150 <= f <= 5900 for f in freqs):
+            info["bands"].append({"name": "5GHz"})
+        if any(5955 <= f <= 7115 for f in freqs):
+            info["bands"].append({"name": "6GHz"})
+
+        out["wifi-radios"].append(info)
+
+
+def probe_ptp_capabilities(out):
+    """Probe PTP timestamping capabilities per physical interface via ethtool --json -T.
+
+    Only physical interfaces (those with a 'device' sysfs symlink) are probed;
+    virtual interfaces such as bridges, VLANs, and tun/tap devices are skipped.
+    Results are stored under out["interfaces"][<ifname>]["ptp-capabilities"].
+    """
+    net_base = "/sys/class/net"
+    if not os.path.exists(net_base):
+        return
+
+    ifaces = {}
+    for ifname in sorted(os.listdir(net_base)):
+        if ifname == "lo":
+            continue
+        # Physical interfaces have a 'device' symlink; virtual ones do not.
+        if not os.path.exists(os.path.join(net_base, ifname, "device")):
+            continue
+
+        try:
+            result = subprocess.run(
+                ["ethtool", "--json", "-T", ifname],
+                capture_output=True, text=True, timeout=5
+            )
+            if result.returncode != 0:
+                continue
+            data = json.loads(result.stdout)[0]
+        except Exception:
+            continue
+
+        caps = {
+            "capabilities": data.get("capabilities", []),
+            "tx-types":     data.get("tx-types", []),
+            "rx-filters":   data.get("rx-filters", []),
+        }
+
+        # phc-index is -1 when no PHC is present; omit in that case.
+        phc = data.get("phc-index", -1)
+        if phc >= 0:
+            caps["phc-index"] = phc
+
+        # hwtstamp provider fields are present only on newer kernels/hardware.
+        if (idx := data.get("hwtstamp-provider-index")) is not None:
+            caps["hwtstamp-provider-index"] = idx
+        if (qual := data.get("hwtstamp-provider-qualifier")) is not None:
+            caps["hwtstamp-provider-qualifier"] = qual
+
+        ifaces[ifname] = {"ptp-capabilities": caps}
+
+    if ifaces:
+        out.setdefault("interfaces", {}).update(ifaces)
 
 
 def main():
     out = {
         "vendor": None,
         "product-name": None,
+        "product-version": None,
         "part-number": None,
         "serial-number": None,
         "mac-address": None,
@@ -342,6 +635,8 @@ def main():
 
     if os.path.exists(QEMUSystem.REV):
         err = probe_qemusystem(out)
+    elif os.path.exists(DMISystem.BASE):
+        err = probe_dmisystem(out)
     elif os.path.exists(DTSystem.BASE):
         err = probe_dtsystem(out)
     else:
@@ -349,6 +644,9 @@ def main():
 
     if err:
         return err
+
+    probe_wifi_radios(out)
+    probe_ptp_capabilities(out)
 
     if not out["factory-password-hash"]:
         sys.stdout.write("\n\n\033[31mCRITICAL BOOTSTRAP ERROR\n" +

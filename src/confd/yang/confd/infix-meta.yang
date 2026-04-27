@@ -3,10 +3,19 @@ module infix-meta {
   namespace "urn:infix:meta:ns:yang:1.0";
   prefix infix-meta;
 
+  import ietf-yang-metadata {
+    prefix md;
+  }
+
   organization "KernelKit";
   contact      "kernelkit@googlegroups.com";
   description  "Infix metadata.";
 
+
+  revision 2025-12-10 {
+    description "Remove the obsolete, not allowed in libyang.";
+    reference "internal";
+  }
   revision 2024-10-18 {
     description "Mark entire meta container obsolete.";
     reference "internal";
@@ -16,12 +25,16 @@ module infix-meta {
     reference "internal";
   }
 
+  md:annotation dirty {
+    type string;
+    description
+      "data";
+  }
+
   container meta {
     description "Meta data";
-    status obsolete;
 
     leaf version {
-      status obsolete; // Ensure frontends don't show this, used for migration.
       description "Configuration file format version, automatically generated.";
       type string;
     }

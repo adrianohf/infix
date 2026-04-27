@@ -22,7 +22,6 @@ from . import env, netutil
 
 def netconf_syn(addr):
     if netutil.tcp_port_is_open(addr, 830):
-        print(f"{addr} answers to TCP connections on port 830 (NETCONF)")
         return True
     else:
         return False
@@ -282,7 +281,7 @@ class Device(Transport):
         """Get Python dictionary version of XML configuration"""
         return self.get_config(xpath).print_dict()
 
-    def put_config(self, edit):
+    def put_config(self, edit, retries=3):
         """Send XML configuration over NETCONF"""
         yang2nc = {
             "none": None,
@@ -298,34 +297,64 @@ class Device(Transport):
             xml = xml.replace(f"yang:operation=\"{src}\"",
                               f"nc:operation=\"{dst}\"" if dst else "")
 
-        for _ in range(0, 3):
+        last_error = None
+        for _ in range(0, retries):
             try:
                 self.ncc.edit_config(xml, default_operation='merge')
+                last_error = None
+                break
             except RpcError as _e:
+                last_error = _e
                 print(f"Failed sending edit-config RPC: {_e}  Retrying ...")
                 time.sleep(1)
                 continue
-            break
 
-    def put_config_dicts(self, models):
+        # If we exhausted all retries, raise the last error
+        if last_error is not None:
+            raise last_error
+
+    def put_config_dicts(self, models, retries=3):
         """PUT full configuration of all models to running-config"""
         config = ""
         infer_put_dict(self.name, models)
 
         for model in models.keys():
-            mod = self.ly.get_module(model)
+            try:
+                mod = self.ly.get_module(model)
+            except libyang.util.LibyangError:
+                raise Exception(f"YANG model '{model}' not found on device. "
+                               f"Model may not be installed or enabled. "
+                               f"Available models can be checked with get_schema_list()") from None
             lyd = mod.parse_data_dict(models[model], no_state=True, validate=False)
             config += lyd.print_mem("xml", with_siblings=True, pretty=False) + "\n"
         # print(f"Send new XML config: {config}")
-        return self.put_config(config)
+        return self.put_config(config, retries=retries)
 
-    def put_config_dict(self, modname, edit):
+    def put_config_dict(self, modname, edit, retries=3):
         """Convert Python dictionary to XMl and send as configuration"""
-        mod = self.ly.get_module(modname)
+        try:
+            mod = self.ly.get_module(modname)
+        except libyang.util.LibyangError:
+            raise Exception(f"YANG model '{modname}' not found on device. "
+                           f"Model may not be installed or enabled. "
+                           f"Available models can be checked with get_schema_list()") from None
         lyd = mod.parse_data_dict(edit, no_state=True, validate=False)
         config = lyd.print_mem("xml", with_siblings=True, pretty=False)
         # print(f"Send new XML config: {config}")
-        return self.put_config(config)
+        return self.put_config(config, retries=retries)
+
+    def patch_config(self, modname, edit, retries=3):
+        """Merge configuration for a single model to running-config
+
+        For NETCONF, this is identical to put_config_dict() since
+        edit-config already has proper NACM support.
+
+        Args:
+            modname: YANG module name
+            edit: Configuration dictionary
+            retries: Number of retry attempts on failure (default 3)
+        """
+        return self.put_config_dict(modname, edit, retries=retries)
 
     def call(self, call):
         """Call RPC, XML version"""
@@ -333,7 +362,12 @@ class Device(Transport):
 
     def call_dict(self, modname, call):
         """Call RPC, Python dictionary version"""
-        mod = self.ly.get_module(modname)
+        try:
+            mod = self.ly.get_module(modname)
+        except libyang.util.LibyangError:
+            raise Exception(f"YANG model '{modname}' not found on device. "
+                           f"Model may not be installed or enabled. "
+                           f"Available models can be checked with get_schema_list()") from None
         lyd = mod.parse_data_dict(call, rpc=True)
         return self.call(lyd.print_mem("xml", with_siblings=True, pretty=False))
 

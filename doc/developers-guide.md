@@ -7,13 +7,16 @@ account, which is created based on credentials found in the VPD area --
 for Qemu devices this is emulated using `qemu_fw_cfg`.
 
 For developers this can be quite frustrating to be blocked from logging
-in to debug the system.  So we recommend enabling the `root` account in
-the Buildroot `make menuconfig` system.
+in to debug the system.  The quickest way to enable root login is to
+apply the `dev` configuration snippet:
 
-    make menuconfig
-         -> System configuration
-            -> [*]Enable root login with password
+    make apply-dev
 
+See [Configuration Snippets](#configuration-snippets) for more details.
+
+> [!IMPORTANT]
+> Please see the [Contributing](#contributing) section, below, for
+> details on how to fork and clone when contributing to Infix.
 
 Cloning
 -------
@@ -25,13 +28,11 @@ tree to your PC:
 ```bash
 $ mkdir ~/Projects; cd ~/Projects
 $ git clone https://github.com/kernelkit/infix.git
+..
 $ cd infix/
 $ git submodule update --init
+..
 ```
-
-> Please see the [Contributing](#contributing) section, below, for
-> details on how to fork and clone when contributing to Infix.
-
 
 ### Customer Builds
 
@@ -57,6 +58,10 @@ Other caveats should be documented in the customer specific trees.
 Building
 --------
 
+> [!TIP]
+> For more details, see the Getting Started and System Requirements
+> sections of the [excellent Buildroot manual][1].
+
 Buildroot is almost stand-alone, it needs a few locally installed tools
 to bootstrap itself.  The most common ones are usually part of the base
 install of the OS, but specific ones for building need the following.
@@ -67,11 +72,9 @@ $ sudo apt install bc binutils build-essential bzip2 cpio \
                    diffutils file findutils git gzip      \
                    libncurses-dev libssl-dev perl patch   \
                    python3 rsync sed tar unzip wget       \
-                   autopoint bison flex autoconf automake
+                   autopoint bison flex autoconf automake \
+                   mtools
 ```
-
-> For details, see the Getting Started and System Requirements sections
-> of the [excellent manual][1].
 
 To build an Infix image; select the target and then make:
 
@@ -95,12 +98,43 @@ and services are required on your system:
 ```bash
 $ sudo apt install jq graphviz qemu-system-x86 qemu-system-arm \
 				   ethtool gdb-multiarch tcpdump tshark
+..
 ```
 
 To be able to build the test specification you also need:
 
 ```bash
 $ sudo apt-get install python3-graphviz ruby-asciidoctor-pdf
+..
+```
+
+### Documentation
+
+The documentation is written in Markdown, with GitHub extensions, and
+published using [MkDocs, material theme][11].  This means some features
+require MkDocs *hinting* which may not render fully when previewing on
+GitHub -- this is OK.
+
+MkDocs is packaged and available to install via `apt`, but not all of
+the plugins and extensions we rely on are available, so instead we do
+recommend using `pipx` to install the necessary tooling:
+
+```bash
+$ sudo apt install pipx
+$ pipx install mkdocs
+$ pipx inject mkdocs mkdocs-material pymdown-extensions mkdocs-callouts mike mkdocs-to-pdf
+```
+
+The last two packages, `mike` and `mkdocs-to-pdf`, are used for online
+versioning and PDF generation by GitHub Actions, but since they are in
+the `mkdocs.yml` file, everyone who wants to preview the documentation
+have to install all the tooling.
+
+Preview with:
+
+```
+$ cd ~/src/infix/
+$ mkdocs serve
 ```
 
 
@@ -132,6 +166,66 @@ on Buildroot to finalize the target filesystem and generate the images.
 The final `run` argument is explained below.
 
 
+### Configuration Snippets
+
+Infix ships a set of Kconfig fragments in `configs/snippets/` that can
+be merged into your active `.config` on demand.  This avoids polluting
+defconfigs with settings that are only useful during development.
+
+To see what snippets are available:
+
+    make list-snippets
+
+To apply a single snippet to the current output directory:
+
+    make apply-dev          # enable root login
+    make apply-ext4         # build an ext4 rootfs (needed for boards
+                            # whose bootloader lacks squashfs support,
+                            # e.g. Marvell ESPRESSObin)
+
+The `apply-*` targets require an existing `.config` (i.e. you must have
+already run a `make <board>_defconfig`).  The snippet is merged using
+Buildroot's `merge_config.sh`, so it behaves like `make menuconfig`:
+unrelated settings are preserved, conflicting ones are overridden.
+
+To apply **all** snippets at once and then build:
+
+    make dev
+
+This is the recommended one-shot command for setting up a development
+build from a freshly selected defconfig.
+
+
+### YANG Model
+
+When making changes to the `confd` and `statd` services, you will often
+need to update the YANG models.  If you are adding a new YANG module,
+it's best to follow the structure of an existing one.  However, before
+making any changes, **always discuss them with the Infix core team**.
+This helps avoid issues later in development and makes pull request
+reviews smoother.
+
+### Configuration Migration
+
+> [!IMPORTANT]
+> Whenever a YANG model change makes existing `startup-config` files
+> incompatible — removing a node, renaming a key, restructuring a
+> container — you **must** include a migration script so that devices
+> upgrading in the field are not left unbootable.
+
+Migration scripts live in `src/confd/share/migrate/<version>/` where
+`<version>` is the confd version (defined in `src/confd/configure.ac`)
+that introduces the breaking change.  Each script receives the path to
+the startup configuration file as its first argument and must edit it
+in-place.  Scripts are run in lexicographic order, so prefix them with
+a number (e.g. `40-my-change.sh`).
+
+See `src/confd/share/migrate/1.6/40-bridge-port-remove-ip.sh` for a
+worked example, and the [Configuration Migration][upgrade-migration]
+section of the Upgrade documentation for the user-facing side of this
+mechanism.
+
+[upgrade-migration]: upgrade.md#configuration-migration
 
 ### `confd`
 
@@ -168,36 +262,36 @@ Now you can rebuild `confd`, just as described above, and restart Infix:
 
 ### `statd`
 
-The Infix status daemon, `src/statd`, is responsible for populating the 
-sysrepo `operational` datastore. Like `confd`, it uses XPath subscriptions, 
-but unlike `confd`, it relies entirely on `yanger`, a Python script that 
+The Infix status daemon, `src/statd`, is responsible for populating the
+sysrepo `operational` datastore. Like `confd`, it uses XPath subscriptions,
+but unlike `confd`, it relies entirely on `yanger`, a Python script that
 gathers data from local linux services and feeds it into sysrepo.
 
 To apply changes, rebuild the image:
 
-    make python-statd-rebuild statd-rebuild all
+    make statd-rebuild all
 
-Rebuilding the image and testing on target for every change during 
-development process can be tedious. Instead, `yanger` allows remote 
-execution, running the script directly on the host system (test 
+Rebuilding the image and testing on target for every change during
+development process can be tedious. Instead, `yanger` allows remote
+execution, running the script directly on the host system (test
 container):
 
     infamy0:test # ../src/statd/python/yanger/yanger -x "../utils/ixll -A ssh d3a" ieee802-dot1ab-lldp
 
 `ixll` is a utility script that lets you run network commands using an
-**interface name** instead of a hostname. It makes operations like 
+**interface name** instead of a hostname. It makes operations like
 `ssh`, `scp`, and network discovery easier.
 
-Normally, `yanger` runs commands **locally** to retrieve data 
-(e.g., `lldpcli` when handling `ieee802-dot1ab-lldp`). However, when 
-executed with `-x "../utils/ixll -A ssh d3a"` it redirects these 
-commands to a remote system connected to the local `d3a` interface via 
-SSH. This setup is used for running `yanger` in an 
+Normally, `yanger` runs commands **locally** to retrieve data
+(e.g., `lldpcli` when handling `ieee802-dot1ab-lldp`). However, when
+executed with `-x "../utils/ixll -A ssh d3a"` it redirects these
+commands to a remote system connected to the local `d3a` interface via
+SSH. This setup is used for running `yanger` in an
 [interactive test environment](testing.md#interactive-usage). The yanger
-script runs on the `host` system, but key commands are executed on the 
+script runs on the `host` system, but key commands are executed on the
 `target` system.
 
-For debugging or testing, you can capture system command output and 
+For debugging or testing, you can capture system command output and
 replay it later without needing a live system.
 
 To capture:
@@ -211,13 +305,110 @@ To replay:
 This is especially useful when working in isolated environments or debugging
 issues without direct access to the DUT.
 
-### Agree on YANG Model
 
-When making changes to the `confd` and `statd` services, you will often need to update
-the YANG models. If you are adding a new YANG module, it's best to follow the 
-structure of an existing one. However, before making any changes, **always discuss
-them with the Infix core team**. This helps avoid issues later in development and 
-makes pull request reviews smoother.
+## Upgrading Packages
+
+### Buildroot
+
+The Kernelkit team maintains an internal [fork of Buildroot][9], with
+branches following the naming scheme `YYYY.MM.patch-kkit`
+e.g. `2025.02.1-kkit`, which means a new branch should be created
+whenever Buildroot is updated. These branches should contain **only**
+changes to existing packages (but no new patches), modifications to
+Buildroot itself or upstream backports.
+
+The team tracks the latest Buildroot LTS (Long-Term Support) release and
+updates.  The impact of minor LTS release upgrades is expected to have a
+very low impact and should be done as soon there is a patch release of a
+Buildroot LTS available.
+
+> **Depending on your setup, follow the appropriate steps below.**
+
+#### Repo locally cloned already
+
+1. Navigate to the Buildroot directory
+
+        cd buildroot/
+
+1. Pull the latest changes from KernelKit
+
+        git pull
+
+1. Fetch the latest tags from upstream
+
+        git fetch upstream --tags
+
+#### No local repo yet
+
+1. Clone the Kernelkit Buildroot repository
+
+        git clone git@github.com:kernelkit/buildroot.git
+
+1. Add the upstream remote
+
+        git remote add upstream https://gitlab.com/buildroot.org/buildroot.git
+
+1. Checkout old KernelKit branch
+ 
+        git checkout 2025.02.1-kkit
+ 
+> [!NOTE] 
+> Below, it is **not** allowed to rebase the branch when bumped in Infix.
+
+#### Continue Here
+
+1. Create a new branch based on the **previous** KernelKit Buildroot
+   release (e.g.  `2025.02.1-kkit`) and name it according to the naming
+   scheme (e.g. `2025.02.2-kkit`)
+
+        git checkout -b 2025.02.2-kkit
+
+1. Rebase the new branch onto the corresponding upstream release
+
+        git rebase 2025.02.2
+
+1. Push the new branch and tags
+
+        git push origin 2025.02.2-kkit --tags
+
+1. In Infix, checkout new branch of Buildroot
+
+        cd buildroot
+        git fetch
+        git checkout 2025.02.2-kkit
+
+1. Commit and push the changes.  *Remember to update the ChangeLog!*
+
+1. Create a pull request.
+
+> [!NOTE] 
+> Remember to set the pull request label to `ci:main` to ensure full CI
+> coverage.
+
+
+### Linux kernel
+
+The KernelKit team maintains an internal [fork of Linux kernel][10],
+with branches following the naming scheme `kkit-linux-[version].y`,
+e.g. `kkit-6.12.y`, which means a new branch should be created whenever
+the major kernel version is updated. This branch should contain *all*
+kernel patches used by Infix.
+
+The team tracks the latest Linux kernel LTS (Long-Term Support) release
+and updates.  The upgrade of LTS minor releases is expected to have low
+impact and should be done as soon as a patch release of the LTS Linux
+kernel is available.
+
+#### Repo locally cloned already
+
+- ./utils/kernel-upgrade.sh /path/to/linux/tree
+- Update Changelog
+- push and create a pull request
+
+> [!NOTE] 
+> Remember to set the pull request label to `ci:main` to ensure full CI
+> coverage.
+
 
 
 Testing
@@ -231,8 +422,8 @@ work is done -- **much quicker** change-load-test cycles.
 
 The Infix automated test suite is built around Qemu and [Qeneth][2], see:
 
- * [Testing](testing.md)
- * [Docker Image](../test/docker/README.md)
+ * [Regression Testing with Infamy](testing.md)
+ * [Docker Image](https://github.com/kernelkit/infix/blob/main/test/docker/README.md)
 
 With any new feature added to Infix, it is essential to include relevant
 test case(s).  See the [Test Development](testing.md#test-development)
@@ -242,14 +433,13 @@ section for guidance on adding test cases.
 Reviewing
 ---------
 
-While reviewing a pull request, you might find yourself wanting to
-play around with a VM running that _exact_ version.  For such
-occations, [gh-dl-artifact.sh](../utils/gh-dl-artifact.sh) is your
-friend in need!  It will use the [GitHub CLI
-(gh)](https://cli.github.com) to locate a prebuilt image from our CI
+While reviewing a pull request, you might find yourself wanting to play
+around with a VM running that _exact_ version.  For such occasions,
+[gh-dl-artifact.sh][8] is your friend in need!  It employs the [GitHub
+CLI (gh)](https://cli.github.com) to locate a prebuilt image from our CI
 workflow, download it, and prepare a local output directory from which
-you can launch both `make run` instances, and run regression tests
-with `make test` and friends.
+you can launch both `make run` instances, and run regression tests with
+`make test` and friends.
 
 For example, if you are curious about how PR 666 behaves in some
 particular situation, you can use `gh` to switch to that branch, from
@@ -261,10 +451,10 @@ corresponding image for execution with our normal tooling:
     cd x-artifact-a1b2c3d4-x86_64
     make run
 
-> **Note:** CI artifacts are built from a merge commit of the source
-> and target branches.  Therefore, the version in the Infix banner
-> will not match the SHA of the commit you have checked out.
-
+> [!NOTE]
+> CI artifacts are built from a merge commit of the source and target
+> branches.  Therefore, the version in the Infix banner will not match
+> the SHA of the commit you have checked out.
 
 Contributing
 ------------
@@ -276,28 +466,32 @@ fork, and then use GitHub to create a *Pull Reqeuest*.
 For this to work as *painlessly as possible* for everyone involved:
 
  1. Fork Infix to your own user or organization[^1]
- 2. Fork all the Infix submodules, e.g., `kernelkit/buildroot` to your
+ 1. Fork all the Infix submodules, e.g., `kernelkit/buildroot` to your
     own user or organization as well
- 3. Clone your fork of Infix to your laptop/workstation
- 4. [Deactivate the Actions][6] you don't want in your fork
- 5. Please read the [Contributing Guidelines][5] as well!
+ 1. Clone your fork of Infix to your laptop/workstation
+ 1. [Deactivate the Actions][6] you don't want in your fork
+ 1. Please read the [Contributing Guidelines][5] as well!
 
 ```bash
 $ cd ~/Projects
 $ git clone https://github.com/YOUR_USER_NAME/infix.git
+...
 $ cd infix/
 $ git submodule update --init
+...
 ```
-> **Note:** when updating/synchronizing with upstream Infix changes you
-> may have to synchronize your forks as well.  GitHub have a `Sync fork`
-> button in the GUI for your fork for this purpose.  A cronjob on your
-> server of choice can do this for you with the [GitHub CLI tool][7].
+
+> [!NOTE]
+> When updating/synchronizing with upstream Infix changes you may have
+> to synchronize your forks as well.  GitHub have a `Sync fork` button
+> in the GUI for your fork for this purpose.  A cronjob on your server
+> of choice can do this for you with the [GitHub CLI tool][7].
 
 [^1]: Organizations should make sure to lock the `main` (or `master`)
     branch of their clones to ensure members do not accidentally merge
     changes there.  Keeping these branches in sync with upstream Infix
     is highly recommended as a baseline and reference.  For integration
-	of local changes another company-specific branch can be used instead.
+    of local changes another company-specific branch can be used instead.
 
 [0]: https://github.com/kernelkit/infix/releases
 [1]: https://buildroot.org/downloads/manual/manual.html
@@ -307,3 +501,7 @@ $ git submodule update --init
 [5]: https://github.com/kernelkit/infix/blob/main/.github/CONTRIBUTING.md
 [6]: https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/disabling-and-enabling-a-workflow
 [7]: https://cli.github.com/
+[8]: https://github.com/kernelkit/infix/blob/main/utils/gh-dl-artifact.sh
+[9]: https://github.com/kernelkit/buildroot
+[10]: https://github.com/kernelkit/linux
+[11]: https://squidfunk.github.io/mkdocs-material/

@@ -1,0 +1,730 @@
+# Scripting with RESTCONF
+
+RESTCONF provides a programmatic interface to both configuration and
+operational data over HTTPS.  This guide shows practical examples using
+`curl` to interact with the RESTCONF API.
+
+All examples use the following conventions:
+
+- **Host**: `example.local` (replace with your device hostname/IP)
+- **Credentials**: `admin:admin` (default username:password)
+- **HTTPS**: Self-signed certificates require `-k` flag in curl
+
+## Helper Script
+
+To simplify RESTCONF operations, create a `curl.sh` wrapper script:
+
+```bash
+#!/bin/sh
+# RESTCONF CLI wrapper for curl
+
+HOST=${HOST:-infix.local}
+DATASTORE=running
+AUTH=admin:admin
+
+usage()
+{
+    cat <<EOF >&2
+Usage: $0 [-v] [-h HOST] [-d DATASTORE] [-u USER:PASS] METHOD XPATH [CURL_ARGS...]
+
+Options:
+  -h HOST    Target host (default: infix.local)
+  -d DS      Datastore: running, operational, startup (default: running)
+  -u CREDS   Credentials as user:pass (default: admin:admin)
+  -v         Verbose mode, use it to display variables and curl command
+
+Methods: GET, POST, PUT, PATCH, DELETE
+EOF
+    exit "$1"
+}
+
+check()
+{
+    hint="Note: URL may be missing a module prefix (e.g., ietf-system:system)"
+    resp="$1"
+    url="$2"
+
+    if ! command -v jq >/dev/null 2>&1; then
+        printf "%s\n" "$resp"
+        return
+    fi
+
+    case "$resp" in
+        *"Syntax error"*)
+            path_only="${url#*//}"
+
+            # Check for common URL error(s), e.g., missing module prefix
+            case "$path_only" in
+                *":"*)
+                    printf "%s\n" "$resp" | jq .
+                    ;;
+                *)
+                    printf "%s\n" "$resp" | jq --arg hint "$hint" \
+                           '.["ietf-restconf:errors"].error[] |= . + {comment: $hint}'
+                    ;;
+            esac
+            ;;
+        *)
+            printf "%s\n" "$resp" | jq .
+            ;;
+    esac
+}
+
+while getopts "h:d:u:v" opt; do
+    case $opt in
+        h) HOST="$OPTARG"      ;;
+        d) DATASTORE="$OPTARG" ;;
+        u) AUTH="$OPTARG"      ;;
+        v) VERBOSE=1           ;;
+        *) usage 1 ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+if [ $# -lt 2 ]; then
+    echo "Error: METHOD and XPATH are required" >&2
+    usage 1
+fi
+
+METHOD=$1
+XPATH=$2
+shift 2
+
+# Ensure XPATH starts with /
+case "$XPATH" in
+    /*) ;;
+    *) XPATH="/$XPATH" ;;
+esac
+
+case "$DATASTORE" in
+    running|startup)
+        URL="https://${HOST}/restconf/data${XPATH}"
+        ;;
+    operational)
+        URL="https://${HOST}/restconf/data${XPATH}"
+        ;;
+    *)
+        echo "Error: Invalid datastore '$DATASTORE'. Use: running, operational, or startup" >&2
+        exit 1
+        ;;
+esac
+
+if [ "$VERBOSE" ]; then
+    echo "DS     : $DATASTORE"
+    echo "OP     : $METHOD"
+    echo "XPATH  : $XPATH"
+    echo "AUTH   : $AUTH"
+    echo "=> URL : $URL"
+    set -x
+fi
+
+RESP=$(/usr/bin/curl --silent                           \
+    --insecure                                          \
+    --user "${AUTH}"                                    \
+    --request "${METHOD}"                               \
+    --header "Content-Type: application/yang-data+json" \
+    --header "Accept: application/yang-data+json"       \
+    "$@"                                                \
+    "${URL}")
+
+check "$RESP" "$URL"
+```
+
+Make it executable:
+
+```bash
+~$ chmod +x curl.sh
+```
+
+This wrapper handles authentication, headers, SSL certificates, and URL
+construction, making commands much cleaner. You can override defaults with
+command-line options or environment variables:
+
+```bash
+# Using command-line options
+~$ ./curl.sh -h 192.168.1.10 -d operational -u admin:secret GET /ietf-interfaces:interfaces
+
+# Using environment variables
+~$ HOST=192.168.1.10 ./curl.sh GET /ietf-system:system
+```
+
+The examples below show both raw `curl` commands and the equivalent using
+`curl.sh` where applicable.
+
+## HTTP Methods in RESTCONF
+
+RESTCONF uses standard HTTP methods to perform different operations on
+configuration and operational data. Understanding when to use each method is
+crucial for correct and safe operations.
+
+### GET - Read Data
+
+Retrieve configuration or operational data without making changes.
+
+**When to use:**
+
+- Reading current configuration
+- Querying operational state (interface statistics, routing tables, etc.)
+- Discovering what exists before making changes
+
+**Characteristics:**
+
+- Safe operation (no side effects)
+- Can be repeated without consequences
+- Works on both configuration and operational datastores
+
+**Example:**
+```bash
+~$ ./curl.sh -h example.local GET /ietf-interfaces:interfaces
+```
+
+### PUT - Replace Resource
+
+> [!DANGER] Heads-up!
+> PUT replaces everything - missing fields will be deleted!
+
+Replace an entire resource with new content.
+
+**When to use:**
+
+- Replacing entire datastore (backup/restore scenarios)
+- Complete reconfiguration of a container
+- When you want to ensure the resource matches exactly what you provide
+
+**Characteristics:**
+
+- Replaces all content at the target path
+- Any existing data not in the PUT request is **removed**
+- Requires complete, valid configuration
+- Dangerous if you don't include all necessary fields
+
+**Example:**
+```bash
+~$ ./curl.sh -h example.local PUT /ietf-system:system \
+     -d '{"ietf-system:system":{"hostname":"newhost","contact":"admin@example.com"}}'
+```
+
+### PATCH - Merge/Update Resource
+
+Partially update a resource by merging changes with existing data.
+
+**When to use:**
+
+- Modifying specific fields while preserving others
+- Working with path-based NACM permissions
+- Incremental configuration changes
+- Safer alternative to PUT for most use cases
+
+**Characteristics:**
+
+- Merges changes with existing configuration
+- Only specified fields are modified
+- Unspecified fields remain unchanged
+- Works with partial data structures
+- NACM-friendly (respects path-based permissions)
+
+**Example:**
+```bash
+~$ ./curl.sh -h example.local PATCH /ietf-interfaces:interfaces \
+     -d '{"ietf-interfaces:interfaces":{"interface":[{"name":"e0","description":"WAN"}]}}'
+```
+
+> [!TIP] Best practice
+> Use PATCH instead of PUT for most configuration updates.
+
+### POST - Create New Resource
+
+Create a new resource within a collection or invoke an RPC.
+
+**When to use:**
+
+- Adding new list entries (interfaces, users, routes, etc.)
+- Creating resources at specific paths
+- Invoking RPC operations (reboot, factory-reset, etc.)
+
+**Characteristics:**
+
+- Creates new resources
+- For lists: adds a new element
+- For RPCs: executes the operation
+- Returns error if resource already exists (for configuration)
+
+**Example - Add IP address:**
+```bash
+~$ ./curl.sh -h example.local POST \
+     /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254 \
+     -d '{"prefix-length": 32}'
+```
+
+**Example - Invoke RPC:**
+```bash
+~$ curl -kX POST -u admin:admin \
+     -H "Content-Type: application/yang-data+json" \
+     https://example.local/restconf/operations/ietf-system:system-restart
+```
+
+### DELETE - Remove Resource
+
+Delete a resource or configuration element.
+
+**When to use:**
+
+- Removing interfaces, routes, users, etc.
+- Deleting specific configuration items
+- Cleaning up unwanted configuration
+
+**Characteristics:**
+
+- Removes the resource completely
+- Cannot be undone (except by reconfiguration)
+- Returns error if resource doesn't exist
+
+**Example:**
+```bash
+~$ ./curl.sh -h example.local DELETE \
+     /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254
+```
+
+### Quick Reference
+
+| **Method** | **Use Case**            | **Safe?** | **Idempotent?** | **NACM Impact**          |
+|------------|-------------------------|-----------|-----------------|--------------------------|
+| GET        | Read data               | ✓         | ✓               | Read permissions         |
+| PUT        | Replace entire resource | ✗         | ✓               | Full write access needed |
+| PATCH      | Merge/update fields     | ✓         | ✓               | Path-specific write      |
+| POST       | Create new/invoke RPC   | ✗         | ✗               | Create/exec permissions  |
+| DELETE     | Remove resource         | ✗         | ✓               | Delete permissions       |
+
+**Key takeaways:**
+
+- **Use PATCH for updates** - Safer than PUT, works with NACM
+- **Use PUT sparingly** - Only when you need complete replacement
+- **GET is always safe** - Read as much as you need
+- **POST for creation/RPCs** - Creating new items or executing operations
+- **DELETE with care** - Cannot be undone
+
+## Discovery & Common Patterns
+
+Before working with specific configuration items, you often need to discover
+what exists on the system. This section shows common discovery patterns and
+practical workflows.
+
+### Discovering Available Interfaces
+
+**List all interface names:**
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces 2>/dev/null | jq -r '.["ietf-interfaces:interfaces"]["interface"][].name'
+lo
+e0
+e1
+```
+
+This is essential for automation - interface names vary by platform (eth0,
+e1, enp0s3, etc.), so scripts should discover them rather than hardcode.
+
+### Get API Capabilities
+
+Discover what YANG modules are available:
+
+```bash
+~$ curl -kX GET -u admin:admin \
+        -H 'Accept: application/yang-data+json' \
+        https://example.local/restconf/data/ietf-yang-library:yang-library
+```
+
+This returns all supported YANG modules, revisions, and features.
+
+### Get Entire Running Configuration
+
+Useful for exploration or backup:
+
+```bash
+~$ ./curl.sh -h example.local GET / -o backup.json
+```
+
+### Common Workflow Patterns
+
+#### Pattern 1: Find interface by IP address
+
+Get all interfaces with IPs and search:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces 2>/dev/null \
+     | jq -r '.["ietf-interfaces:interfaces"]["interface"][] | select(.["ietf-ip:ipv4"]["address"][]?.ip == "192.168.1.100") | .name'
+```
+
+#### Pattern 2: List all interfaces that are down
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces 2>/dev/null \
+     | jq -r '.["ietf-interfaces:interfaces"]["interface"][] | select(.["oper-status"] == "down") | .name'
+```
+
+#### Pattern 3: Get statistics for all interfaces
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces 2>/dev/null \
+     | jq -r '.["ietf-interfaces:interfaces"]["interface"][] | "\(.name): RX \(.statistics["in-octets"]) TX \(.statistics["out-octets"])"'
+```
+
+Output:
+
+```
+lo: RX 29320 TX 29320
+e0: RX 1847392 TX 892341
+e1: RX 0 TX 0
+```
+
+#### Pattern 4: Check if interface exists before configuring
+
+```bash
+~$ if ./curl.sh -h example.local GET /ietf-interfaces:interfaces/interface=eth0 2>/dev/null | grep -q "ietf-interfaces:interface"; then
+     echo "Interface eth0 exists"
+   else
+     echo "Interface eth0 not found"
+   fi
+```
+
+## Configuration Operations
+
+### Read Hostname
+
+Example of fetching JSON configuration data:
+
+**Using curl directly:**
+
+```bash
+~$ curl -kX GET -u admin:admin \
+        -H 'Accept: application/yang-data+json' \
+        https://example.local/restconf/data/ietf-system:system/hostname
+{
+  "ietf-system:system": {
+    "hostname": "foo"
+  }
+}
+```
+
+**Using curl.sh:**
+
+```bash
+~$ ./curl.sh -h example.local GET /ietf-system:system/hostname
+{
+  "ietf-system:system": {
+    "hostname": "foo"
+  }
+}
+```
+
+### Set Hostname
+
+Example of updating configuration with inline JSON data:
+
+**Using curl directly:**
+
+```bash
+~$ curl -kX PATCH -u admin:admin \
+     -H 'Content-Type: application/yang-data+json' \
+     -d '{"ietf-system:system":{"hostname":"bar"}}' \
+     https://example.local/restconf/data/ietf-system:system
+```
+
+**Using curl.sh:**
+
+```bash
+~$ ./curl.sh -h example.local PATCH /ietf-system:system \
+     -d '{"ietf-system:system":{"hostname":"bar"}}'
+```
+
+### Update Interface Description
+
+PATCH allows you to modify specific parts of the configuration without
+replacing the entire container. This is particularly useful when working
+with NACM (Network Access Control Model) permissions that grant access to
+specific paths.
+
+**Why use PATCH instead of PUT:**
+
+- **Partial updates**: Only changes specified fields, preserves others
+- **NACM-friendly**: Works with path-based access control rules
+- **Safer**: Reduces risk of accidentally removing unrelated configuration
+
+**Example - Modify an interface description:**
+
+```bash
+~$ curl -kX PATCH -u admin:admin \
+     -H 'Content-Type: application/yang-data+json' \
+     -d '{"ietf-interfaces:interfaces":{"interface":[{"name":"e0","description":"WAN Port"}]}}' \
+     https://example.local/restconf/data/ietf-interfaces:interfaces
+```
+
+**Using curl.sh:**
+
+```bash
+~$ ./curl.sh -h example.local PATCH /ietf-interfaces:interfaces \
+     -d '{"ietf-interfaces:interfaces":{"interface":[{"name":"e0","description":"WAN Port"}]}}'
+```
+
+**Formatted for readability:**
+
+```bash
+~$ curl -kX PATCH -u admin:admin \
+     -H 'Content-Type: application/yang-data+json' \
+     -d '{
+       "ietf-interfaces:interfaces": {
+         "interface": [
+           {
+             "name": "e0",
+             "description": "WAN Port"
+           }
+         ]
+       }
+     }' \
+     https://example.local/restconf/data/ietf-interfaces:interfaces
+```
+
+**Key points:**
+
+- PATCH URL targets the **container** (`/interfaces`), not a specific interface
+- JSON body includes the full structure with the interface array
+- Only specified fields are modified; other interface settings remain unchanged
+- The `name` field identifies which interface to update
+
+**Verify the change:**
+
+```bash
+~$ ./curl.sh -h example.local GET /ietf-interfaces:interfaces/interface=e0 2>/dev/null \
+     | jq '.["ietf-interfaces:interface"][0].description'
+"WAN Port"
+```
+
+### Add IP Address to Interface
+
+Add an IP address to the loopback interface:
+
+```bash
+~$ ./curl.sh -h example.local POST \
+     /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254 \
+     -d '{ "prefix-length": 32 }'
+```
+
+### Delete IP Address from Interface
+
+Remove an IP address from the loopback interface:
+
+```bash
+~$ ./curl.sh -h example.local DELETE \
+     /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254
+```
+
+### Copy Running to Startup
+
+No copy command available yet to copy between datastores, and the
+Rousette back-end also does not support "write-through" to the
+startup datastore.
+
+To save running-config to startup-config, fetch running to a local file
+and then update startup with it:
+
+**Using curl directly:**
+
+```bash
+~$ curl -kX GET -u admin:admin -o running-config.json \
+        -H 'Accept: application/yang-data+json'       \
+         https://example.local/restconf/ds/ietf-datastores:running
+
+~$ curl -kX PUT -u admin:admin -d @running-config.json \
+        -H 'Content-Type: application/yang-data+json'  \
+        https://example.local/restconf/ds/ietf-datastores:startup
+```
+
+**Using curl.sh:**
+
+```bash
+~$ ./curl.sh -h example.local GET / -o running-config.json
+~$ ./curl.sh -h example.local -d startup PUT / -d @running-config.json
+```
+
+## Operational Data
+
+### Read Interface Configuration
+
+Get the running configuration for the loopback interface:
+
+```bash
+~$ ./curl.sh -h example.local GET /ietf-interfaces:interfaces/interface=lo
+```
+
+### Read Interface Operational State
+
+Get operational data (state, statistics, etc.) for an interface:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces/interface=lo
+```
+
+This includes administrative and operational state, MAC address, MTU, and
+statistics counters.
+
+### Read Interface Statistics
+
+Extract specific statistics using `jq`:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces/interface=eth0 2>/dev/null \
+     | jq -r '.["ietf-interfaces:interfaces"]["interface"][0]["statistics"]["in-octets"]'
+```
+
+### List All Interfaces
+
+Get operational data for all interfaces:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-interfaces:interfaces
+```
+
+### Read Routing Table
+
+Get the IPv4 routing table:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-routing:routing/ribs/rib=ipv4-default
+```
+
+### Read OSPF State
+
+Get OSPF operational data (neighbors, routes, etc.):
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-routing:routing/control-plane-protocols/control-plane-protocol=ietf-ospf:ospfv2,default
+```
+
+Or get just the neighbor information:
+
+```bash
+~$ ./curl.sh -h example.local -d operational GET /ietf-routing:routing/control-plane-protocols/control-plane-protocol=ietf-ospf:ospfv2,default/ietf-ospf:ospf/areas/area=0.0.0.0/interfaces
+```
+
+## System Operations (RPCs)
+
+### Factory Reset
+
+Reset the system to factory defaults:
+
+```bash
+~$ curl -kX POST -u admin:admin \
+        -H "Content-Type: application/yang-data+json" \
+        https://example.local/restconf/operations/ietf-factory-default:factory-reset
+curl: (56) OpenSSL SSL_read: error:0A000126:SSL routines::unexpected eof while reading, errno 0
+```
+
+> **Note:** The connection error is expected - the device resets immediately.
+
+### System Reboot
+
+Reboot the system:
+
+```bash
+~$ curl -kX POST -u admin:admin \
+        -H "Content-Type: application/yang-data+json" \
+        https://example.local/restconf/operations/ietf-system:system-restart
+```
+
+### Set Date and Time
+
+Example of an RPC that takes input/arguments:
+
+```bash
+~$ curl -kX POST -u admin:admin \
+        -H "Content-Type: application/yang-data+json" \
+        -d '{"ietf-system:input": {"current-datetime": "2024-04-17T13:48:02-01:00"}}' \
+        https://example.local/restconf/operations/ietf-system:set-current-datetime
+```
+
+Verify the change with SSH:
+
+```bash
+~$ ssh admin@example.local 'date'
+Wed Apr 17 14:48:12 UTC 2024
+```
+
+## Advanced Examples
+
+### Makefile for Common Operations
+
+Create a `Makefile` to simplify common operations:
+
+```makefile
+HOST ?= infix.local
+
+lo-running:
+	./curl.sh -h $(HOST) GET /ietf-interfaces:interfaces/interface=lo
+
+lo-operational:
+	./curl.sh -h $(HOST) -d operational GET /ietf-interfaces:interfaces/interface=lo
+
+lo-add-ip:
+	./curl.sh -h $(HOST) POST \
+	    /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254 \
+	    -d '{ "prefix-length": 32 }'
+
+lo-del-ip:
+	./curl.sh -h $(HOST) DELETE \
+	    /ietf-interfaces:interfaces/interface=lo/ietf-ip:ipv4/address=192.168.254.254
+
+%-stats:
+	@./curl.sh -h $(HOST) -d operational GET /ietf-interfaces:interfaces/interface=$* 2>/dev/null \
+	    | jq -r '.["ietf-interfaces:interfaces"]["interface"][0]["statistics"]["in-octets"]'
+
+%-monitor:
+	while sleep 0.2; do make -s HOST=$(HOST) $*-stats; done \
+	    | ttyplot -t "$(HOST):$* in-octets" -r
+```
+
+Usage examples:
+
+```bash
+# Get loopback operational state
+~$ make lo-operational
+
+# Add IP to loopback
+~$ make lo-add-ip
+
+# Get eth0 statistics
+~$ make eth0-stats
+
+# Monitor eth0 traffic in real-time (requires ttyplot)
+~$ make eth0-monitor
+```
+
+You can override the host:
+
+```bash
+~$ make HOST=192.168.1.10 lo-operational
+```
+
+### Monitoring Interface Traffic
+
+The `%-monitor` target demonstrates real-time monitoring by polling
+interface statistics and piping to `ttyplot` for visualization. Install
+`ttyplot` with:
+
+```bash
+~$ sudo apt install ttyplot
+```
+
+Then monitor any interface:
+
+```bash
+~$ make eth0-monitor
+```
+
+This creates a live ASCII graph of incoming octets on `eth0`.
+
+## References
+
+- [RESTCONF Protocol (RFC 8040)](https://datatracker.ietf.org/doc/html/rfc8040)
+- [YANG Data Modeling Language (RFC 7950)](https://datatracker.ietf.org/doc/html/rfc7950)
+- [ietf-interfaces YANG module](https://datatracker.ietf.org/doc/html/rfc8343)
+- [ietf-routing YANG module](https://datatracker.ietf.org/doc/html/rfc8349)
+- [ietf-system YANG module](https://datatracker.ietf.org/doc/html/rfc7317)

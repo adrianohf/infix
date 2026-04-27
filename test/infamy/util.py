@@ -5,6 +5,7 @@ import threading
 import infamy.neigh
 from infamy import netconf
 from infamy import restconf
+import urllib.request
 
 
 class ParallelFn(threading.Thread):
@@ -37,12 +38,20 @@ def parallel(*fns):
 
 
 def until(fn, attempts=10, interval=1):
+    last_exc = None
     for attempt in range(attempts):
-        if fn():
-            return
+        try:
+            result = fn()
+        except Exception as e:
+            last_exc = e
+            result = False
+        if result:
+            return result
 
         time.sleep(interval)
 
+    if last_exc:
+        raise last_exc
     raise Exception("Expected condition did not materialize")
 
 
@@ -97,3 +106,24 @@ def warn(msg):
     YELLOW = "\033[93m"
     RST = "\033[0m"
     print(f"{YELLOW}warn - {msg}{RST}")
+
+def curl(url, timeout=10, silent=False):
+    """Fetch a URL and return its response body as a UTF-8 string.
+
+    Args:
+        url (str): The full URL to fetch.
+        timeout (int): Request timeout in seconds.
+        silent (bool): If True, suppress warning on failure (for retry scenarios).
+
+    Returns:
+        str | None: Response body as text, or None if the request failed.
+    """
+    url = urllib.parse.quote(url, safe='/:')
+
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
+            return response.read().decode('utf-8', errors='replace')
+    except (urllib.error.URLError, ConnectionResetError, UnicodeEncodeError, TimeoutError) as e:
+        if not silent:
+            print(f"[WARN] curl: failed to fetch {url}: {e}")
+        return ""

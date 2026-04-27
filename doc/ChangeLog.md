@@ -3,7 +3,486 @@ Change Log
 
 All notable changes to the project are documented in this file.
 
-[v25.05.0][UNRELEASED]
+[v26.04.0][UNRELEASED] -
+-------------------------
+
+### Changes
+
+- Upgrade Linux kernel to 6.18.24 (LTS)
+- Upgrade Buildroot to 2025.02.13 (LTS)
+- Add support for PTP/gPTP (IEEE 1588-2019 / 802.1AS) clock synchronization.
+  Supported clock types: Ordinary Clock, Boundary Clock, and Transparent Clock.
+  See the User Guide for configuration details
+- Add support for [Banana Pi BPI-R4][BPI-R4], quad-core Cortex-A73 router with
+  4x 2.5 GbE switching, dual 10 GbE SFP+.  Variants BPI-R4-2g5 and BPI-R4P have
+  one SFP+ replaced by a 2.5 GbE RJ45, with optional PoE on the R4P
+
+### Fixes
+
+- Fix #1458: `show ntp tracking` displaying a truncated Reference ID, e.g.,
+  `92.2` instead of `92.246.137.39`
+- Fix #1466: `show container` showing no output for containers whose command
+  line includes environment variables
+
+[BPI-R4]: https://docs.banana-pi.org/en/BPI-R4/BananaPi_BPI-R4
+
+[v26.03.0][] - 2026-03-31
+-------------------------
+
+### Changes
+
+- Upgrade Linux kernel to 6.18.20 (LTS)
+- Upgrade Buildroot to 2025.02.12 (LTS)
+- Upgrade FRR to 10.5.3
+- Add support for [Banana Pi R64 Mini][BPI-R64], 5 port router with WiFi 5
+- Add support for [Raspberry Pi 400][RPI-400], an RPi 4B built into a keyboard
+- Significant boot time improvements, issue #1284.  The [InitViz][] boot
+  profiling tool is now included for users who want to visualize and measure
+  the boot process on their own hardware
+- Add OSPF point-to-multipoint (P2MP) and hybrid interface type support.  This
+  also includes support for setting static neighbors, issue #1426
+- **Revamped <http://network.local> device browser**.  Device cards now
+  show the IP address, product name, and firmware version from mDNS TXT
+  records.  the mDNS browser is now also available over plain HTTP
+- mDNS service records now embed the per-device hostname (using avahi's `%h`
+  wildcard), so devices avoid the `#2`, `#3` suffix collisions on service names
+  when multiple Infix devices share the same LAN
+- Add configurable mDNS hostname: set `services mdns hostname` to override the
+  mDNS name advertised in A/AAAA records.  Supports `%h` (default hostname),
+  `%i` (hardware ID), and `%m` (MAC address) format specifiers
+- cli: new `show mdns` command to list  mDNS-discovered devices on the LAN,
+  with addresses and product model
+- Add SSH client commands to the CLI:
+   - `ssh [user <name>] [port <num>] <host>` — connect to a remote device
+   - `set ssh known-hosts <host> <keytype> <pubkey>` — pre-enroll a host key
+     received out-of-band, e.g. after a factory reset
+   - `no ssh known-hosts <host>` — remove a stale or changed host key entry
+- Add support for user-configurable HTTPS certificate: select any certificate
+  stored in the keystore via `services web certificate <name>`.  The default
+  auto-generated self-signed certificate is now stored in the keystore rather
+  than in `/cfg/ssl` and existing certificates are auto-migrated on upgrade
+- Add NTP `stratum-weight` setting to fine-tune server selection when multiple
+  NTP sources are available with different stratum levels
+- Enable HDMI console output on Raspberry Pi 4 and Pi 400.  Previously the
+  display was suppressed; a login prompt now appears on the HDMI monitor
+
+### Fixes
+
+- Fix #892: suppress rousette RESTCONF server warnings from syslog
+- Fix #1122: add missing migration script for the YANG validation introduced
+  in v25.10.0 that disallows IP addresses on bridge member ports.  Without
+  this script, upgrading with such a `startup-config` would prevent the device
+  from booting.  The migration removes all IP addresses from bridge member
+  ports; any addresses that should be kept must be re-added to the bridge
+  interface itself after upgrade
+- Fix #1387: `infix.local` now resolves to exactly one device per LAN.  Previously
+  all Infix devices claimed both `hostname.local` and `infix.local`, causing avahi
+  to append `#2`, `#3` suffixes to the shared alias on busy networks.  Assignment
+  is now first-come-first-served using standard mDNS conflict resolution
+- Fix #1389: firewall policies with names longer than 17 characters were
+  silently rejected
+- Fix #1416: `show firewall` command show an error when the firewall is disabled
+- Fix #1438: default route from DHCP client not set at boot, regression in v26.02.0
+- Fix #1446: suppress netopeer2-server NETCONF server warnings from syslog
+- Fix #1456: update project links in SUPPORT.md and README.md to point to
+  the home page and blog at <https://www.kernelkit.org>, and update the
+  release link to always resolve to the latest stable release
+- Fix regression in MVEBU SafeXcel Crypto Engine for Marvell Armada SOCs (37xx,
+  7k, 8k, and CN913x series).  Firmware package lost in v26.01.0
+- Fix DHCP client not sending hostname to server (e.g. for `dnsmasq` lease
+  registration).  All board factory configs had the hostname option without
+  `value: auto`, so `udhcpc` only requested the option instead of sending it.
+  Setting up a DHCP client manually was not affected.  Also, the hostname
+  format string (e.g. `rpi-%m`) was not expanded to the actual system hostname
+  before being passed to `udhcpc`
+- Fix dnsmasq logging spurious "Ignoring duplicate dhcp-option" warnings for
+  options 3 (router) and 6 (dns-server) on every DHCP transaction.  Add
+  `dhcp-authoritative` so clients with unexpired leases are not NAKed after
+  a router crash or factory reset that clears the lease database
+
+[BPI-R64]:  https://docs.banana-pi.org/en/BPI-R64/BananaPi_BPI-R64
+[RPI-400]:  https://www.raspberrypi.com/products/raspberry-pi-400/
+[InitViz]:  https://github.com/finit-project/InitViz
+
+[v26.02.0][] - 2026-03-01
+-------------------------
+
+> [!NOTE]
+> The blog and User Guide have a new address: <https://www.kernelkit.org>
+
+### Changes
+
+- Upgrade Linux kernel to 6.18.15 (LTS)
+- Upgrade Buildroot to 2025.02.11 (LTS)
+- Upgrade FRR to 10.5.1
+- Add support for [Microchip SAMA7G54][SAMA7G54-EK] Evaluation Kit, Arm Cortex-A7
+- Add support for [Banana Pi R3 Mini][BPI-R3-MINI], a 2 port router with 2 WiFi chip,
+  uses the same bootloader as BPI-R3 (eMMC-version)
+- Add GPS/GNSS receiver support with NTP reference clock integration
+- Add `reset-volumes` option to `container upgrade foo` command
+
+### Fixes
+
+- Fix CLI `copy` command problem to copy to scp/sftp destinations
+
+[BPI-R3-MINI]: https://wiki.banana-pi.org/Banana_Pi_BPI-R3_Mini
+[SAMA7G54-EK]: https://www.microchip.com/en-us/development-tool/ev21h18a
+
+[v26.01.0][] - 2026-02-03
+-------------------------
+
+> [!IMPORTANT]
+> This release includes **breaking changes** to WiFi configuration that will
+> result in existing configuration being disabled:
+>
+> - WiFi station/client configuration has been restructured. The `wifi` container
+>   now requires a `radio` reference, and station configuration has moved under a
+>   `wifi/station` container. Existing WiFi configurations must be manually updated
+> - WiFi radios are now configured via `ietf-hardware` instead of the interfaces module
+>
+> Also, **Raspberry Pi users must upgrade the bootloader** before upgrading to
+> this release.  We recommend backing up your `startup-config.cfg` and reflash
+> the SD card with a new [sd card image][].
+
+### Changes
+
+Noteworthy changes and additions in this release are marked below in bold text.
+
+- **Upgrade Linux kernel from 6.12.65 to 6.18.8 (LTS)**
+- Upgrade Buildroot to 2025.02.10 (LTS)
+- Upgrade libyang to 4.2.2
+- Upgrade sysrepo to 4.2.10
+- Upgrade netopeer2 (NETCONF) to 2.7.0
+- Add **RIPv2 routing support**, issue #582
+- Add **NTP server support**, issue #904
+- Migrate DHCPv6 client to odhcp6c for improved Router Advertisement
+  integration.  Adds support for hybrid RA+DHCPv6 deployments where SLAAC
+  assigns addresses and DHCPv6 provides DNS (common ISP scenario)
+- Add support for configurable OSPF debug logging, issue #1281. Debug options
+  can now be enabled per category (bfd, packet, ism, nsm, default-information,
+  nssa). All debug options are disabled by default to prevent log flooding in
+  production environments. See the documentation for usage examples
+- Add support for configurable container resource limits, memory and CPU.
+  Resource usage is available through the operational datastore, where the
+  currently active resource limits in the container runtime are also available
+- Add support for "routing interfaces", issue #647.  Lists interfaces with IP
+  forwarding.  Inspect from CLI using `show interface`, look for `⇅` flag
+- Add operational data journal to statd with hierarchical time-based retention
+  policy, keeping snapshots from every 5 minutes (recent) to yearly (historical)
+- Add support data collection script, useful when troubleshooting issues on
+  deployed systems. Gathers system information, logs, and more.  Issue #1287
+- Add **WiFi Access Point (AP) mode with multi-SSID support and WPA2/WPA3**
+  security.  **BREAKING:** WiFi architecture refactored with radios configured
+  via `ietf-hardware` and interfaces requiring `radio` reference. Station
+  config moved to `wifi/station` container.  Existing Wi-Fi interfaces will be
+  removed during upgrade (for the rest of the configuration to apply) and you
+  need to reconfigure them again.  See the [WiFi][] documentation for details
+- Add support for **WireGuard VPN tunnels**.
+- Updated CLI change command to support `cleartext-symmetric-key` (type binary).
+  Used by both WireGuard and WiFi, with application-specific `key-format` for
+  keys and passphrases
+- New default NACM privilege levels (user levels) in `factory-config`:
+  `operator` (network & container manager) and `guest` (read-only).  For
+  details, see the updated system configuration documentation, as well as a
+  new dedicated NACM configuration guide
+- New `show nacm` admin-exec command to inspect access control rules
+- CLI now supports Ctrl-@ and Ctrl-w/Meta-w to mark and copy test regions
+- CLI now uses `copy` and `rpc` tools instead of deprecated `sysrepocfg`.  The
+  latter now also require the use of `sudo` for `admin` level users
+- Enhanced `copy` command with XPath filtering support
+- Kernel now announces details of new USB devices
+- New `show keystore` admin-exec command to inspect stored keys and
+  certificates without entering configure context
+- `show system` now displays CPU/SoC temperature on all supported platforms,
+  including those that report it under the `soc` or `core` sensor name
+- CN913x (Marvell Octeon) platforms now use the hardware SBSA watchdog,
+  ensuring the device recovers automatically from software lockups
+
+### Fixes
+
+- Fix #515: add per-interface IPv6 forwarding control using the Linux 6.17+
+  `force_forwarding` sysctl.  This provides true per-interface IPv6 forwarding
+  similar to IPv4, correctly mapping to the ietf-ip.yang model semantics
+- Fix #1082: Wi-Fi interfaces always scanned, introduce a `scan-mode` to the
+  Wi-Fi concept in Infix
+- Fix #1292: watchdog not working on NanoPi R2S due to a broken DesignWare
+  WDT on the RK3328 SoC; the hardware watchdog is now disabled on this board
+- Fix #1313: Container is not restarted if environment variable is changed
+- Fix #1314: Raspberry Pi 4B with 1 or 8 GiB RAM does not boot.  This was due
+  newer EEPROM firmware in newer boards require a newer rpi-firmware package
+- Fix #1345: firewall not updating when interfaces become bridge/lag ports
+- Fix #1346: firewall complains in syslog, missing `/etc/firewalld/firewalld.conf`
+- Fix Raspberry Pi 2B build, among other things, the `aarch32_defconfig` did
+  not include a dtb.  Please note, the platform has now been renamed to `arm`
+- Fix default password hash in `do password encrypt` command.  New hash is the
+  same as the more commonly used `change password` command, *yescrypt*
+- Fix BPI-R3 hardware watchdog, wrong kernel config option used — the device
+  would not recover automatically from a software lockup
+- Fix WiFi signal strength display showing inverted quality labels (`excellent`
+  shown for weak signals, `bad` for strong)
+- Fix `follow` command (both shell and CLI) not properly handling log rotation;
+  it now shows the full log and tails it correctly across rotations
+- Prevent MOTD from showing on non-shell user login attempts
+- Fix mDNS reflector never actually enabling — the avahi config was written
+  with `on`/`off` instead of the correct `yes`/`no` values, so enabling the
+  reflector in the configuration had no effect
+
+[wifi]: https://www.kernelkit.org/infix/latest/wifi/
+[sd card image]: https://github.com/kernelkit/infix/releases/download/latest-boot/infix-rpi64-sdcard.img
+
+
+[v25.11.0][] - 2025-12-02
+-------------------------
+
+> [!NOTE]
+> Noteworthy changes and additions in this release:
+>
+> - DHCPv6 client support
+> - Configurable support for TTL in GRE/VXLAN tunnels
+> - Extensive filtering support for syslog messages
+
+### Changes
+
+- Upgrade Buildroot to 2025.02.8 (LTS)
+- Upgrade Linux kernel to 6.12.60 (LTS)
+- Initial support for 32-bit ARM systems, reference board: Raspberry Pi 2B
+- Enable MVEBU SafeXcel Crypto Engine firmware for Marvell Armada SOCs (37xx,
+  7k, 8k, and CN913x series). Fixes kernel warnings about firmware load failures
+  and crypto-safexcel probe errors on affected boards
+- Major improvements to OSPF and BFD operational data and CLI commands:
+   - CLI commands now use data from the operational datastore instead of
+     calling vtysh directly, providing better integration and consistency
+   - New `show ip ospf` command family (neighbor, interface, route) to align
+     with industry standard CLI conventions. Legacy `show ospf` commands are
+     deprecated but still work with warnings
+   - The `show ip ospf database` subcommand has been dropped for now, the
+     advanced user can still use `vtysh` from Bash if necessary, issue #1253
+   - Extended BFD commands: `show bfd` (status), `show bfd peers` (detailed),
+     `show bfd peers brief` (table format), and `show bfd peer <address>`
+   - All command names now use singular form (interface, route, neighbor)
+     matching Cisco/FRR conventions, as well as configure context naming
+   - New support for configuring OSPF interface priority for DR/BDR election
+- The DHCP client configuration has moved from `/infix-dhcp-client:dhcp-client`
+  to `/interfaces/interface[name]/ipv4/infix-dhcp-client:dhcp`, issue #1109.
+  The configuration is automatically migrated on upgrade.  The DHCP client is
+  now enabled using a presence container instead of a separate `enabled` leaf
+- The `enabled` node for IPv4 autoconf (ZeroConf) has been dropped, `autoconf`
+  is now a presence container.  Configuration automatically migrated on upgrade
+- Add DHCPv6 client support for per-interface IPv6 configuration, augmenting
+  `/interfaces/interface[name]/ipv6/infix-dhcpv6-client:dhcp`, issue #1110
+- Fix namespace for DHCPv4 client YANG module from `urn:ietf:params:xml:ns:yang`
+  to `urn:infix:params:xml:ns:yang` to properly reflect custom implementation
+- Improvements to `sdcard.img` generation, useful for developers mostly:
+   - The NanoPi R2S bootloader is now automatically built and uploaded to
+     the [`latest-boot` release][latest-boot] tag
+   - The `utils/mkimage.sh` script now supports fetching the bootloader
+   - The raspberrypi-rpi64 board's bootloader is now aptly named rpi64
+- Add support for configuring TTL, ToS/DSCP, and Path MTU Discovery on GRE and
+  VXLAN tunnels.  This also changes the default TTL of tunnels to 64, from the
+  kernel default (*inherit*), which in turn fixes reported issues with dropped
+  OSPF Hello frames in GRE tunnels
+- [Document][bpi-r3-emmc-documentation] how to go from SD card to eMMC on BPi-R3
+- Add CLI commands for managing boot partition order: `show boot-order` and
+  `set boot-order` allow viewing and changing the boot order from the CLI,
+  complementing the existing YANG RPC support, issue #1032
+- Extended syslog filtering capabilities, issue #1091:
+   - Add support for pattern matching using POSIX extended regular expressions
+     on message content (IETF `select-match` feature)
+   - Add support for advanced severity comparison: exact match (`equals`) and
+     exclusion (`block`/`stop`) in addition to the default equals-or-higher
+     (IETF `select-adv-compare` feature)
+   - Add support for hostname-based filtering, useful when acting as a log
+     server to route messages from different devices to separate log files
+   - Add support for property-based filtering with operators (contains, isequal,
+     startswith, regex, ereregex) on message properties (msg, msgid, programname,
+     hostname, source, data), with optional case-insensitive and negate modifiers
+- Update factory configuration for BPi-R3 and NanoPi R2S boards to enable
+  DHCPv6 client on WAN interface and allow traffic forwarding from LAN to WAN
+  zone in the firewall (this is what most users expect)
+- New `support` command for collecting system diagnostics to aid in both
+  troubleshooting and support.  Run `support collect > data.tar.gz`
+  locally or remotely via SSH to gather configuration, logs, network state,
+  and system information (encryption using `gpg` available too)
+
+### Fixes
+
+- Fix #855: User admin sometimes fails to be added to `wheel` group
+- Fix #1112: setting hostname via DHCP client sometimes gets overridden by the
+  configured system hostname
+- Fix #1247: Prevent invalid configuration of OSPF backbone area (0.0.0.0) as
+  stub or NSSA. The backbone must always be a normal area per RFC 2328. Any
+  existing invalid configurations are automatically corrected during upgrade
+- Fix #1255: serious regression in boot time, introduced in v25.10, delays the
+  boot step "Mounting filesystems ...", from 30 seconds up to five minutes!
+- Fix #1289: SSH host key generation warning at boot after factory reset
+- Fix broken intra-document links in container and tunnel documentation
+- Fix `show dhcp-server` command crashing with invalid timestamp format.
+  DHCP lease expiry timestamps had double timezone suffix causing libyang
+  validation errors
+- Fix `show dhcp-server` output alignment. The EXPIRES column was misaligned
+  when CLIENT ID field was empty, and CLIENT ID column was too narrow for
+  typical 20-character client IDs
+
+[latest-boot]: https://github.com/kernelkit/infix/releases/latest-boot
+[bpi-r3-emmc-documentation]: https://github.com/kernelkit/infix/blob/main/board/aarch64/bananapi-bpi-r3/README.md
+
+[v25.10.0][] - 2025-10-31
+-------------------------
+
+> [!NOTE]
+> Noteworthy changes and additions in this release:
+>
+> **🛡️ Zone-Based Firewall (ZBF):** Protect your network with our zone-based
+> firewall powered by [firewalld][].  Define security zones, set policies
+> between them, and enable masquerading.
+>
+> **📊 System & Hardware Monitoring:** CLI `show system`, `show services`, and
+> `show hardware` now give you instant visibility into CPU temperature, fan
+> speeds, memory, running services, and sensor data from SFP modules, WiFi radios,
+> and more.  All operational data also available over NETCONF and RESTCONF.
+>
+> **🚀 Expanded Hardware Support:** The NanoPi R2S is now included in the
+> default Aarch64 build, which also adds support for Raspberry Pi 3B, and
+> Raspberry Pi CM4 variants.  All boards now benefit from automatic `/var`
+> partition expansion on first boot.
+
+[firewalld]: https://firewalld.org
+
+### Changes
+
+- Upgrade Buildroot to 2025.02.7 (LTS)
+- Upgrade Linux kernel to 6.12.56 (LTS)
+- Extend NETCONF and RESTCONF scripting documentation with operational data
+  examples, discovery patterns, and common workflow examples, issue #1156
+- Initial support for a zone-based firewall, based on `firewalld`, issue #448
+- Add `validate` option to CLI `copy` command.  This can be used before doing a
+  restore of a backup, or when having edited configuration files manually. With
+  the validate flag (`-n` from the shell) the file is only loaded and validated
+  against the YANG models, it is *not* rolled in if validation is successful.
+  Example: `copy /media/backup/old.cfg running-config validate`, issue #373
+- Automatically expand `/var` partition at first boot on all MMC-based devices
+- New `upgrade` RPC (action) for containers using images with mutable tags
+- Optimize startup of preexisting containers by adding metadata to track all
+  OCI archives loaded into container store, and all container configurations
+  used to create container instances.  Instances are now only recreated when
+  metadata from an existing instance does not match either the configuration
+  or the image — because of configuration changes or image upgrades
+- Updated container documentation on volumes, image tags, and image upgrade
+- Add new `show services` command to display running system services
+- Add new `show system` command with comprehensive system overview including
+  hostname, uptime, load average, CPU/fan temperatures, memory, disk usage
+- Add hardware sensor monitoring support in `show hardware` with hierarchical
+  display of temperature, fan, voltage, current, and power sensors
+- Add support for NanoPi R2S router platform to the default Aarch64 build,
+  bumping it to Tier 2 support (SD-card images built separately)
+- Add support for Raspberry Pi 3B (BCM2837)
+- Add support for Raspberry Pi Compute Module 4 IoT Router Board Mini
+- Add support for Raspberry Pi Compute Module 4 NVME NAS box
+- Add `reboot` option to CLI `upgrade` command for automatic system restart
+
+### Fixes
+
+- Fix #981: copying any file, including `running-config`, to the persistent
+  back-end store for `startup-config`, does not take
+- Fix #1121: Ensure DHCP server does not crash if no address pool is set.  This
+  change infers a pool range (only) for /24 networks, and only when a pool is
+  enabled.  YANG validation for this and other use-cases is also included.  As
+  an unforeseen bonus, Infix now also support non-pool (static lease) setups
+- Fix #1122: Add YANG validation for consistency, IP addresses are not allowed
+  on bridge port (interfaces).  Even though Infix previously allowed this, but
+  disregarded it operationally, it is no longer supported in the configuration
+- Fix #1146: Possible to set longer containers names than the system supports.
+  Root cause, a limit of 15 characters implicitly imposed by the service mgmt
+  daemon, Finit.  The length has not been increased to 64 characters (min: 2)
+  and the YANG model now properly warns if the name is outside of these limits
+- Fix #1147: Use container metadata to clean up lingering old container images
+  instead of using the too broad `podman image prune -af` command
+- Fix #1148: Only retry container instance create on remote images
+- Fix #1149: Increase `podman stop` timeout, from 10 to 30 seconds, needed with
+  bigger containers on heavily loaded systems
+- Fix #1194: CLI `text-editor` command does not do proper input sanitation
+- Fix #1197: RPi4 no longer boots after BPi-R3 merge, introduced in v25.09
+- Upgrade fixes for containers with mutable images, e.g., `:latest`.  Infix now
+  always tries to fetch a new version of the OCI archive, for remote images,
+  regardless of the transport.  After upgrade the old image is pruned
+- Fix #1203: copying any file, including `startup-config`, to `running-config`
+  does not take
+
+[v25.09.0][] - 2025-09-30
+-------------------------
+
+### Changes
+
+- Upgrade Buildroot to 2025.02.6 (LTS)
+- Upgrade Linux kernel to 6.12.49 (LTS)
+- Upgrade libyang to 3.13.5
+- Upgrade sysrepo to 3.7.11
+- Upgrade netopeer2 (NETCONF) to 2.4.5
+- Upgrade rousette (RESTCONF) to v2
+- Add support for [Banana Pi R3][BPI-R3], a 7 port switch with 2 WiFi chip
+- Add neofetch system information tool for system introspection, issue #1143
+- Add mtr and iperf3 network diagnostic tools, issue #1144
+- Improve default bash settings with better history handling and tab completion
+- cli: new `terminal reset` and `terminal resize` convenience commands
+
+### Fixes
+
+- Fix #1080: Error message in log from rauc, deprecated 'Install' D-Bus method
+- Fix #1100: Reduce DHCP client logging verbosity by 70% and include interface
+  names in log messages for easier troubleshooting
+- Fix #1119: CLI UX regression, restore proper behavior for `no enabled` command
+- Fix #1155: `show ospf` commands regression
+- Fix #1150: `show-legacy` wrapper permissions
+- Fix #1161: error in log during boot about unsupported command
+- Fix #1169: Expected neighbors not shown in sysrepocfg
+- Fixes for unicode translation in log and pager outputs as well as `syslogd`
+
+[BPI-R3]: https://wiki.banana-pi.org/Banana_Pi_BPI-R3
+
+[v25.08.0][] - 2025-09-01
+-------------------------
+
+### Changes
+- Upgrade Buildroot to 2025.02.5 (LTS)
+- Upgrade Linux kernel to 6.12.44 (LTS)
+- Raspberry Pi 4 is now a part of the aarch64 image.
+- Add support for [Raspberry Pi touch display][RPI-TOUCH] on Raspberry Pi 4
+
+### Fixes
+- Fix #1098: Prune dangling container images to reclaim disk space
+- Fix #1123: Disabling or removing a container may cause podman to hang
+- Fix #1124: Container setup with unreachable remote image spawns
+  excessive `ip monitor` processes
+- Fix #1127: Silence libyang Obsolete schema node warnings in log
+
+[RPI-TOUCH]: https://www.raspberrypi.com/products/raspberry-pi-touch-display/
+
+[v25.06.0][] - 2025-07-01
+-------------------------
+
+### Changes
+- Upgrade Buildroot to 2025.02.4 (LTS)
+- Upgrade Linux kernel to 6.12.35 (LTS)
+- Upgrade curiOS built-in containers to v25.06.0
+- Add support for setting mode of a container content mount, issue #1070
+- Add Wi-Fi client support and add support for some USB-Wi-Fi cards
+- New slogan: Infix OS — Immutable.Friendly.Secure
+
+### Fixes
+- cli: fix by-word movement, detect word barrier using non-alphanum chars
+- cli: fix delete word left/right, make sure to save word in kill buffer
+
+
+[v25.05.1][] - 2025-06-12
+-------------------------
+
+### Changes
+- Upgrade Linux kernel to 6.12.32 (LTS)
+
+### Fixes
+- Fix #1060: Restore of missing CLI commands, regression in Infix v25.05.0
+
+[v25.05.0][] - 2025-05-27
 -------------------------
 
 ### Changes
@@ -22,8 +501,8 @@ All notable changes to the project are documented in this file.
 
 ### Fixes
 - Fix containers with multiple mounts
-- Correct description for LAG LACP modes 
-- Fix #1040: Add `mount` constraint for container config 
+- Correct description for LAG LACP modes
+- Fix #1040: Add `mount` constraint for container config
 
 
 [v25.04.0][] - 2025-04-30
@@ -366,7 +845,7 @@ renamed to ease maintenance, more info below.
   not supported (yet) in Infix, issue #709
 - The default builds now include the curiOS nftables container image,
   which can be used for advanced firewall setups.  For an introduction
-  see <https://kernelkit.org/posts/firewall-container/>
+  see <https://www.kernelkit.org/posts/firewall-container/>
 
 ### Fixes
 
@@ -1569,7 +2048,16 @@ Supported YANG models in addition to those used by sysrepo and netopeer:
  - N/A
 
 [buildroot]:  https://buildroot.org/
-[UNRELEASED]: https://github.com/kernelkit/infix/compare/v25.04.0...HEAD
+[UNRELEASED]: https://github.com/kernelkit/infix/compare/v26.03.0...HEAD
+[v26.03.0]:   https://github.com/kernelkit/infix/compare/v26.02.0...v26.03.0
+[v26.02.0]:   https://github.com/kernelkit/infix/compare/v26.01.0...v26.02.0
+[v26.01.0]:   https://github.com/kernelkit/infix/compare/v25.11.0...v26.01.0
+[v25.11.0]:   https://github.com/kernelkit/infix/compare/v25.10.0...v25.11.0
+[v25.10.0]:   https://github.com/kernelkit/infix/compare/v25.09.0...v26.10.0
+[v25.09.0]:   https://github.com/kernelkit/infix/compare/v25.08.0...v26.09.0
+[v25.08.0]:   https://github.com/kernelkit/infix/compare/v25.06.1...v26.08.0
+[v25.06.0]:   https://github.com/kernelkit/infix/compare/v25.05.1...v26.06.0
+[v25.05.1]:   https://github.com/kernelkit/infix/compare/v25.05.0...v25.05.1
 [v25.05.0]:   https://github.com/kernelkit/infix/compare/v25.04.0...v25.05.0
 [v25.04.0]:   https://github.com/kernelkit/infix/compare/v25.03.0...v25.04.0
 [v25.03.0]:   https://github.com/kernelkit/infix/compare/v25.02.0...v25.03.0

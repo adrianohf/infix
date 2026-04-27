@@ -1,3 +1,4 @@
+from ..host import HOST
 from . import common
 
 from . import bridge
@@ -7,6 +8,8 @@ from . import lag
 from . import tun
 from . import veth
 from . import vlan
+from . import wifi
+from . import wireguard
 
 
 def statistics(iplink):
@@ -24,13 +27,19 @@ def statistics(iplink):
 
 
 def iplink2yang_type(iplink):
+    ifname=iplink["ifname"]
+
     match iplink["link_type"]:
         case "loopback":
             return "infix-if-type:loopback"
         case "gre"|"gre6":
             return "infix-if-type:gre"
         case "ether":
-            pass
+            data = HOST.run(tuple(f"ls /sys/class/net/{ifname}/wireless/".split()), default="no")
+            if data != "no":
+                return "infix-if-type:wifi"
+        case "none":
+            pass # WireGuard interfaces is for some reason link_type none
         case _:
             return "infix-if-type:other"
 
@@ -49,6 +58,8 @@ def iplink2yang_type(iplink):
             return "infix-if-type:veth"
         case "vlan":
             return "infix-if-type:vlan"
+        case "wireguard":
+            return "infix-if-type:wireguard"
 
     return "infix-if-type:ethernet"
 
@@ -106,8 +117,37 @@ def interface_common(iplink, ipaddr):
     return interface
 
 
-def interface(iplink, ipaddr):
+def ptp_capabilities(ifname, systemjson):
+    """Return infix-interfaces:ptp-capabilities dict for ifname, or None."""
+    caps = systemjson.get("interfaces", {}).get(ifname, {}).get("ptp-capabilities")
+    if not caps:
+        return None
+
+    result = {}
+    if cl := caps.get("capabilities"):
+        result["capabilities"] = cl
+    if (phc := caps.get("phc-index")) is not None:
+        result["phc-index"] = phc
+    if tx := caps.get("tx-types"):
+        result["tx-types"] = tx
+    if rx := caps.get("rx-filters"):
+        result["rx-filters"] = rx
+    if (idx := caps.get("hwtstamp-provider-index")) is not None:
+        result["hwtstamp-provider-index"] = idx
+    if qual := caps.get("hwtstamp-provider-qualifier"):
+        result["hwtstamp-provider-qualifier"] = qual
+
+    return result or None
+
+
+def interface(iplink, ipaddr, systemjson=None):
     interface = interface_common(iplink, ipaddr)
+
+    if systemjson is None:
+        systemjson = {}
+
+    if ptpcap := ptp_capabilities(iplink["ifname"], systemjson):
+        interface["infix-interfaces:ptp-capabilities"] = ptpcap
 
     match interface["type"]:
         case "infix-if-type:bridge":
@@ -133,6 +173,12 @@ def interface(iplink, ipaddr):
         case "infix-if-type:vlan":
             if v := vlan.vlan(iplink):
                 interface["infix-interfaces:vlan"] = v
+        case "infix-if-type:wifi":
+            if w := wifi.wifi(iplink["ifname"]):
+                interface["infix-interfaces:wifi"] = w
+        case "infix-if-type:wireguard":
+            if wg := wireguard.wireguard(iplink):
+                interface["infix-interfaces:wireguard"] = wg
 
     match iplink2yang_lower(iplink):
         case "infix-interfaces:bridge-port":
@@ -146,16 +192,23 @@ def interface(iplink, ipaddr):
 
 
 def interfaces(ifname=None):
+    from ..host import HOST
+
     links = common.iplinks(ifname)
     addrs = common.ipaddrs(ifname)
+    systemjson = HOST.read_json("/run/system.json", {})
 
     interfaces = []
     for ifname, iplink in links.items():
         if iplink.get("group") == "internal":
             continue
 
+        link_type = iplink.get("link_type")
+        if link_type in ("can", "vcan"):
+            continue
+
         ipaddr = addrs.get(ifname, {})
 
-        interfaces.append(interface(iplink, ipaddr))
+        interfaces.append(interface(iplink, ipaddr, systemjson))
 
     return interfaces

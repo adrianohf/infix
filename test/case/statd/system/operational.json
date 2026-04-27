@@ -2,14 +2,25 @@
   "ietf-hardware:hardware": {
     "component": [
       {
+        "class": "iana-hardware:chassis",
+        "infix-hardware:phys-address": "00:a0:85:00:03:00",
+        "mfg-name": "QEMU",
+        "model-name": "Standard PC (i440FX + PIIX, 1996)",
+        "name": "mainboard",
+        "state": {
+          "admin-state": "unknown",
+          "oper-state": "enabled"
+        }
+      },
+      {
         "infix-hardware:vpd-data": {},
         "name": "product"
       },
       {
         "class": "infix-hardware:usb",
-        "name": "USB",
+        "name": "USB1",
         "state": {
-          "admin-state": "unlocked",
+          "admin-state": "locked",
           "oper-state": "enabled"
         }
       },
@@ -17,7 +28,7 @@
         "class": "infix-hardware:usb",
         "name": "USB2",
         "state": {
-          "admin-state": "unlocked",
+          "admin-state": "locked",
           "oper-state": "enabled"
         }
       }
@@ -28,7 +39,8 @@
       "user": [
         {
           "name": "admin",
-          "password": "$5$mI/zpOAqZYKLC2WU$i7iPzZiIjOjrBF3NyftS9CCq8dfYwHwrmUK097Jca9A"
+          "password": "$5$mI/zpOAqZYKLC2WU$i7iPzZiIjOjrBF3NyftS9CCq8dfYwHwrmUK097Jca9A",
+          "infix-system:shell": "infix-system:bash"
         }
       ]
     },
@@ -39,8 +51,8 @@
   },
   "ietf-system:system-state": {
     "clock": {
-      "boot-datetime": "2025-04-30T09:47:32+00:00",
-      "current-datetime": "2025-04-30T09:48:01+00:00"
+      "boot-datetime": "2026-01-02T20:42:11+00:00",
+      "current-datetime": "2026-01-02T20:43:23+00:00"
     },
     "infix-system:dns-resolver": {
       "options": {},
@@ -79,6 +91,295 @@
           }
         ]
       }
+    },
+    "infix-system:resource-usage": {
+      "filesystem": [
+        {
+          "available": "0",
+          "mount-point": "/",
+          "size": "142720",
+          "used": "142720"
+        },
+        {
+          "available": "79270",
+          "mount-point": "/var",
+          "size": "86427",
+          "used": "281"
+        },
+        {
+          "available": "12860",
+          "mount-point": "/cfg",
+          "size": "14073",
+          "used": "67"
+        }
+      ],
+      "load-average": {
+        "load-15min": "0.02",
+        "load-1min": "0.12",
+        "load-5min": "0.05"
+      },
+      "memory": {
+        "available": "225652",
+        "free": "134936",
+        "total": "355076"
+      }
+    },
+    "infix-system:services": {
+      "service": [
+        {
+          "description": "Device event daemon (udev)",
+          "name": "udevd",
+          "pid": 1185,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "D-Bus message bus daemon",
+          "name": "dbus",
+          "pid": 2248,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Configuration daemon",
+          "name": "confd",
+          "pid": 3039,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "NETCONF server",
+          "name": "netopeer",
+          "pid": 3548,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "DHCP/DNS proxy",
+          "name": "dnsmasq",
+          "pid": 2249,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Getty on hvc0",
+          "name": "tty:hvc0",
+          "pid": 3559,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "LED daemon",
+          "name": "iitod",
+          "pid": 2340,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "CLI backend daemon",
+          "name": "klishd",
+          "pid": 3560,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "mDNS alias advertiser ",
+          "name": "mdns-alias",
+          "pid": 3617,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Spanning Tree daemon",
+          "name": "mstpd",
+          "pid": 0,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "0"
+          },
+          "status": "stopped"
+        },
+        {
+          "description": "Software update service",
+          "name": "rauc",
+          "pid": 3564,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Update DNS configuration",
+          "name": "resolvconf",
+          "pid": 0,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 2,
+            "uptime": "0"
+          },
+          "status": "done"
+        },
+        {
+          "description": "Status daemon",
+          "name": "statd",
+          "pid": 3472,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1389"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Static routing daemon",
+          "name": "staticd",
+          "pid": 3653,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "System log daemon",
+          "name": "syslogd",
+          "pid": 2241,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "System watchdog daemon",
+          "name": "watchdogd",
+          "pid": 2242,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1390"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Zebra routing daemon",
+          "name": "zebra",
+          "pid": 3587,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Avahi mDNS-SD daemon",
+          "name": "mdns",
+          "pid": 3616,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Chrony NTP v3/v4 daemon",
+          "name": "chronyd",
+          "pid": 3618,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "LLDP daemon (IEEE 802.1ab)",
+          "name": "lldpd",
+          "pid": 3633,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "Web server",
+          "name": "nginx",
+          "pid": 3635,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "RESTCONF server",
+          "name": "rousette",
+          "pid": 3636,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        },
+        {
+          "description": "OpenSSH daemon",
+          "name": "sshd",
+          "pid": 3641,
+          "statistics": {
+            "memory-usage": "0",
+            "restart-count": 0,
+            "uptime": "1388"
+          },
+          "status": "running"
+        }
+      ]
     },
     "infix-system:software": {
       "boot-order": [
@@ -150,8 +451,8 @@
     "platform": {
       "machine": "x86_64",
       "os-name": "Infix",
-      "os-release": "v25.04.0-rc1-3-g8daf1571-dirty",
-      "os-version": "v25.04.0-rc1-3-g8daf1571-dirty"
+      "os-release": "v25.11.0-135-g44d2af57-dirty",
+      "os-version": "v25.11.0-135-g44d2af57-dirty"
     }
   }
 }

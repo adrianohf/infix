@@ -1,4 +1,4 @@
-# Introduction
+# CLI Introduction
 
 The command line interface (CLI, see-ell-aye) implements a CISCO-like,
 or Juniper Networks JunOS-like, CLI.  It is the traditional way of
@@ -10,8 +10,7 @@ Nevertheless, when it comes to initial deployment and debugging, it
 is very useful to know how to navigate and use the CLI.  This very
 short guide intends to help you with that.
 
-
-## About
+----
 
 New users usually get the CLI as the default "shell" when logging in,
 but the default `admin` user logs in to `bash`.  To access the CLI,
@@ -35,9 +34,10 @@ admin@host-12-34-56:/> show                   # Try: Tab or ?
 admin@host-12-34-56:/>                        # Try: Tab or ?
 ```
 
-> **Tip:** Even on an empty command line you can tap the Tab or ? keys.
-> See `help keybindings` for more tips!
-
+> **Tip**
+>
+> Even on an empty command line, you can tap the `Tab` or `?` keys.  
+> See [`help keybindings`](keybindings.md) for more tips!
 
 ## Key Concepts
 
@@ -76,15 +76,15 @@ and *running* that can be managed and inspected using the `copy`,
 `show`, and `configure` commands.  The traditional names used in the CLI
 for these are listed below:
 
- - `factory-config` the default configuration from factory for the
-   device, i.e., what the system returns to after a `factory-reset`
- - `startup-config` created from `factory-config` at first boot after
-   factory reset.  Loaded as the system configuration on each boot
- - `running-config` what is actively running on the system.  If no
-   changes have been made since boot, it is the same as `startup-config`
- - `candidate-config` is created from `running-config` when entering the
-   configure context.  Any changes made here can be discarded (`abort`,
-   `rollback`) or committed (`commit`, `leave`) to `running-config`
+- `factory-config` the default configuration from factory for the
+  device, i.e., what the system returns to after a `factory-reset`
+- `startup-config` created from `factory-config` at first boot after
+  factory reset.  Loaded as the system configuration on each boot
+- `running-config` what is actively running on the system.  If no
+  changes have been made since boot, it is the same as `startup-config`
+- `candidate-config` is created from `running-config` when entering the
+  configure context.  Any changes made here can be discarded (`abort`,
+  `rollback`) or committed (`commit`, `leave`) to `running-config`
 
 Edit the *running* configuration using the `configure` command.  This
 copies *running* to *candidate*, a temporary datastore, where changes
@@ -129,10 +129,12 @@ In *configure context* the following commands are available:
 | `do command`      | Call admin-exec command: `do show log`                 |
 | `commit`          |                                                        |
 
-### Example Session
+## Example Session
 
-> Remember to use the `TAB` and `?` keys to speed up your navigation.
-> See `help keybindings` for more tips!
+> **Tip**
+>
+> Remember to use the `TAB` and `?` keys to speed up your navigation.  
+> See [`help keybindings`](keybindings.md) for more tips!
 
 In this example we enter configure context to add an IPv4 address to
 interface `eth0`, then we apply the changes using the `leave` command.
@@ -144,8 +146,8 @@ save the changes for the next reboot.
 admin@host-12-34-56:/> configure
 admin@host-12-34-56:/config/> edit interface eth0
 admin@host-12-34-56:/config/interface/eth0/> set ipv4 <TAB>
-      address     autoconf bind-ni-name      enabled
-	  forwarding  mtu      neighbor
+      address     autoconf      bind-ni-name     dhcp 
+      enabled     forwarding    mtu              neighbor
 admin@host-12-34-56:/config/interface/eth0/> set ipv4 address 192.168.2.200 prefix-length 24
 admin@host-12-34-56:/config/interface/eth0/> show
 type ethernetCsmacd;
@@ -162,9 +164,14 @@ interfaces {
   }
 }
 admin@host-12-34-56:/config/interface/eth0/> leave
-admin@host-12-34-56:/> show interfaces brief
-lo               UNKNOWN        00:00:00:00:00:00 <LOOPBACK,UP,LOWER_UP>
-eth0             UP             52:54:00:12:34:56 <BROADCAST,MULTICAST,UP,LOWER_UP>
+admin@host-12-34-56:/> show interfaces
+INTERFACE       PROTOCOL   STATE       DATA
+lo              loopback   UNKNOWN     00:00:00:00:00:00
+                ipv4                   127.0.0.1/8 (static)
+                ipv6                   ::1/128 (static)
+eth0            ethernet   UP          52:54:00:12:34:56
+                ipv4                   192.168.2.200/24 (static)
+                ipv6                   fe80::5054:ff:fe12:3456/64 (link-layer)
 admin@host-12-34-56:/> show ip brief
 lo               UNKNOWN        127.0.0.1/8 ::1/128
 eth0             UP             192.168.2.200/24 fe80::5054:ff:fe12:3456/64
@@ -179,5 +186,14 @@ change that, e.g., breaks networking, it is trivial to revert back by:
 admin@host-12-34-56:/> copy startup-config running-config
 ```
 
-Or restarting the device.
+Or restart the device, for example if the change to the configuration
+caused you to lose contact with the system (it happens to the best of
+us).  The system will start up from the last "save game".
 
+> **Tip:** Restoring Backups
+>
+> When restoring a backup of a configuration, or having manually edited
+> a config file, you can validate it using the system's YANG models, it
+> is *not* applied if validation is successful:
+>
+> `copy /media/backup/old.cfg running-config validate`

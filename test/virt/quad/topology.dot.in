@@ -9,7 +9,7 @@ graph "quad" {
 	edge [color="cornflowerblue", penwidth="2"];
 
 	qn_template="infix-bios-x86_64";
-	qn_image="infix-x86_64-disk-test.qcow2"
+	qn_image="infix-x86_64-test.qcow2"
 	qn_oui="00:a0:85";
 	qn_append="quiet";
 
@@ -23,15 +23,18 @@ graph "quad" {
         dut1 [
 	    label="{ <e1> e1 | <e2> e2 | <e3> e3 | <e4> e4 } | dut1 | { <e5> e5 | <e6> e6 | <e7> e7 | <e8> e8}",
 	    pos="10,30!",
-	    provides="infix",
+	    provides="infix watchdog gps",
+	    expected_boot="primary",
 	    qn_console=9001,
 	    qn_mem="384M",
-	    qn_usb="dut1.usb"
+	    qn_usb="dut1.usb",
+	    qn_gps="true"
 	    ];
         dut2 [
 	    label="{ <e1> e1 | <e2> e2 | <e3> e3 | <e4> e4 } | dut2 | { <e5> e5 | <e6> e6  | <e7> e7 | <e8> e8}",
 	    pos="0,20!",
-	    provides="infix",
+	    provides="infix watchdog",
+	    expected_boot="primary",
 	    qn_console=9002,
 	    qn_mem="384M",
 	    qn_usb="dut2.usb"
@@ -39,7 +42,8 @@ graph "quad" {
 	dut3 [
 	    label="{ <e1> e1 | <e2> e2 | <e3> e3 | <e4> e4 } | dut3 | { <e5> e5 | <e6> e6  | <e7> e7 | <e8> e8}",
 	    pos="0,10!",
-	    provides="infix",
+	    provides="infix watchdog",
+	    expected_boot="primary",
 	    qn_console=9003,
 	    qn_mem="384M",
 	    qn_usb="dut3.usb"
@@ -48,7 +52,8 @@ graph "quad" {
 	dut4 [
 	    label="{ <e1> e1 | <e2> e2 | <e3> e3 | <e4> e4 } | dut4 | { <e5> e5 | <e6> e6  | <e7> e7 | <e8> e8}",
 	    pos="10,0!",
-	    provides="infix",
+	    provides="infix watchdog",
+	    expected_boot="primary",
 	    qn_console=9004,
 	    qn_mem="384M",
 	    qn_usb="dut4.usb"

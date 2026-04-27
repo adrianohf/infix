@@ -85,14 +85,35 @@ SKELETON_INIT_FINIT_POST_INSTALL_TARGET_HOOKS += SKELETON_INIT_FINIT_SET_DROPBEA
 endif
 
 ifeq ($(BR2_PACKAGE_FRR),y)
+ifeq ($(BR2_PACKAGE_NETD_FRR_CONF),y)
 define SKELETON_INIT_FINIT_SET_FRR
-	for svc in babeld bfdd bgpd eigrpd isisd ldpd ospfd ospf6d pathd ripd ripng staticd vrrpd zebra; do	\
+	cp $(SKELETON_INIT_FINIT_AVAILABLE)/frr/frr.conf $(FINIT_D)/available/frr.conf
+	ln -sf ../available/frr.conf $(FINIT_D)/enabled/frr.conf
+endef
+else
+define SKELETON_INIT_FINIT_SET_FRR
+	for svc in babeld bfdd bgpd mgmtd eigrpd isisd ldpd ospfd ospf6d pathd ripd ripng staticd vrrpd zebra; do	\
 		cp $(SKELETON_INIT_FINIT_AVAILABLE)/frr/$$svc.conf $(FINIT_D)/available/$$svc.conf;		\
 	done
-	ln -sf ../available/staticd.conf $(FINIT_D)/enabled/staticd.conf
 	ln -sf ../available/zebra.conf $(FINIT_D)/enabled/zebra.conf
+	ln -sf ../available/staticd.conf $(FINIT_D)/enabled/staticd.conf
+	ln -sf ../available/mgmtd.conf $(FINIT_D)/enabled/mgmtd.conf
 endef
+endif
 SKELETON_INIT_FINIT_POST_INSTALL_TARGET_HOOKS += SKELETON_INIT_FINIT_SET_FRR
+
+ifeq ($(BR2_PACKAGE_FRR_GRPC),y)
+define SKELETON_INIT_FINIT_SET_FRR_MGMTD_GRPC
+	cp $(SKELETON_INIT_FINIT_PKGDIR)/skeleton/etc/default/mgmtd $(TARGET_DIR)/etc/default/mgmtd
+	$(SED) 's/\(MGMTD_ARGS="[^"]*\)"/\1 -M grpc"/' $(TARGET_DIR)/etc/default/mgmtd
+endef
+else
+define SKELETON_INIT_FINIT_SET_FRR_MGMTD_GRPC
+	cp $(SKELETON_INIT_FINIT_PKGDIR)/skeleton/etc/default/mgmtd $(TARGET_DIR)/etc/default/mgmtd
+endef
+endif
+SKELETON_INIT_FINIT_POST_INSTALL_TARGET_HOOKS += SKELETON_INIT_FINIT_SET_FRR_MGMTD_GRPC
+
 endif # BR2_PACKAGE_FRR
 
 ifeq ($(BR2_PACKAGE_INADYN),y)

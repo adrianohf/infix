@@ -1,0 +1,133 @@
+#!/bin/sh
+# Generate factory-config, failure-config, and test-config files.
+#
+# These configs are derived from default settings snippets in
+# /usr/share/confd/factory.d, and generated snippets (e.g., hostname
+# based on base MAC address, number of interfaces).
+#
+# The sysrepo datastore operations (loading factory defaults, startup
+# config, migration) are handled by the confd daemon.
+########################################################################
+# NOTE: with the Infix defaults, a br2-external can provide a build-time
+#       /etc/factory-config.cfg to override the behavior of this script.
+#
+#       This applies also for /etc/failure-config.cfg, but we recommend
+#       strongly that you instead provide gen-err-custom, see below.
+########################################################################
+
+# Log functions
+err()
+{
+    logger -i -p user.err -t gen-config "$1" 2>/dev/null || echo "$1"
+}
+
+log()
+{
+    logger -i -p user.notice -t gen-config "$1" 2>/dev/null || echo "$1"
+}
+
+# /etc/confdrc controls the behavior of most of the gen-scripts,
+# customize in an overlay when using Infix as an br2-external.
+RC=/etc/confdrc
+if [ "$1" = "-f" ] && [ -f "$2" ]; then
+    RC=$2
+fi
+
+if [ ! -f "$RC" ]; then
+    err "Missing rc file $RC"
+    exit 99
+fi
+
+# shellcheck disable=SC1090
+. "$RC"
+
+# Gather all .json files in $dir, sort them numerically, and use jq
+# magic to create a configuration file without duplicates.  Allowing
+# overrides of the Infix defaults in a br2-external.
+#
+#   10-foo.json         -- Static Infix default
+#   20-bar.json         -- Generated Infix bar
+#   30-config.json      -- By br2-external provided gen-cfg-custom
+#   30-foo.json         -- Static br2-external replacing 10-foo.json
+#
+# Note: to override just the base hostname, used in gen-hostname, set
+#       BR2_TARGET_GENERIC_HOSTNAME in your br2-external's defconfig.
+#
+# shellcheck disable=SC2046,SC2086
+collate()
+{
+    gen=$1; shift
+    cfg=$1; shift
+    dir=$1
+
+    rm -f "$gen"
+    jq -s 'reduce .[] as $item ({}; . * $item)' $(find $dir -name '*.json' | sort) >"$gen"
+    chmod 444 "$gen"
+
+    if [ ! -f "$cfg" ]; then
+	cp "$gen" "$cfg"
+    fi
+}
+
+gen_factory_cfg()
+{
+    # Fetch defaults, simplifies sort in collate()
+    cp "$FACTORY_DEFAULTS_D"/* "$FACTORY_D/"
+
+    # Create an overlay for /etc/hostname to change the default in an br2-external
+    gen-hostname                                            >"$FACTORY_D/20-hostname.json"
+    gen-motd                                                >"$FACTORY_D/20-motd.json"
+    gen-hardware                                            >"$FACTORY_D/20-hardware.json"
+    # shellcheck disable=SC2086
+    gen-interfaces $GEN_IFACE_OPTS                          >"$FACTORY_D/20-interfaces.json"
+    gen-version                                             >"$FACTORY_D/20-version.json"
+
+    # Optional commands (from an overlay) to run for br2-externals
+    [ -x "$(command -v gen-ifs-custom)" ] && gen-ifs-custom >"$FACTORY_D/20-interfaces.json"
+    [ -x "$(command -v gen-cfg-custom)" ] && gen-cfg-custom >"$FACTORY_D/30-config.json"
+
+    collate "$FACTORY_GEN" "$FACTORY_CFG" "$FACTORY_D"
+}
+
+gen_failure_cfg()
+{
+    # Fetch defaults, simplifies sort in collate()
+    cp "$FAILURE_DEFAULTS_D"/* "$FAILURE_D"
+
+    gen-hostname   "$FAIL_HOSTNAME"                         >"$FAILURE_D/20-hostname.json"
+    gen-interfaces                                          >"$FAILURE_D/20-interfaces.json"
+    gen-version                                             >"$FAILURE_D/20-version.json"
+
+    # Optional failure/error config to generate (or override) for br2-externals
+    [ -x "$(command -v gen-err-custom)" ] && gen-err-custom >"$FAILURE_D/30-error.json"
+
+    collate "$FAILURE_GEN" "$FAILURE_CFG" "$FAILURE_D"
+}
+
+gen_test_cfg()
+{
+    # Fetch defaults, simplifies sort in collate()
+    cp "$TEST_DEFAULTS_D"/* "$TEST_D"
+
+    gen-hostname   "$TEST_HOSTNAME"                         >"$TEST_D/20-hostname.json"
+    gen-interfaces                                          >"$TEST_D/20-interfaces.json"
+    gen-version                                             >"$TEST_D/20-version.json"
+
+    collate "$TEST_GEN" "$TEST_CFG" "$TEST_D"
+}
+
+log "Starting up, calling gen_factory_cfg()"
+gen_factory_cfg
+log "Starting up, calling gen_failure_cfg()"
+gen_failure_cfg
+
+if [ -f "/mnt/aux/test-mode" ]; then
+    gen_test_cfg
+fi
+
+# Ensure 'admin' group users always have access to /cfg
+mkdir -p "$CFG_PATH_"
+chgrp wheel "$CFG_PATH_" 2>/dev/null
+chmod g+w   "$CFG_PATH_" 2>/dev/null
+
+log "All done."

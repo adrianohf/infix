@@ -1,4 +1,11 @@
-[7mUSB PORTS                     [0m
-[7mNAME                STATE     [0m
-USB                 unlocked  
-USB2                unlocked  
+[7mHARDWARE COMPONENTS                                           [0m
+──────────────────────────────────────────────────────────────
+[1mBoard Information[0m
+Model               : Standard PC (i440FX + PIIX, 1996)
+Manufacturer        : QEMU
+Base MAC Address    : 00:a0:85:00:03:00
+──────────────────────────────────────────────────────────────
+[1mUSB Ports[0m
+[7mNAME                                           STATE   OPER   [0m
+USB1                                           locked  enabled
+USB2                                           locked  enabled

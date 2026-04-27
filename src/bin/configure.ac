@@ -10,11 +10,13 @@ AC_CONFIG_FILES([
 
 AC_PROG_CC
 AC_PROG_INSTALL
+AC_PROG_LN_S
 
 # Check for pkg-config first, warn if it's not installed
 PKG_PROG_PKG_CONFIG
 
 PKG_CHECK_MODULES([libite],  [libite  >= 2.5.0])
+PKG_CHECK_MODULES([libyang], [libyang >= 3.0.0])
 PKG_CHECK_MODULES([sysrepo], [sysrepo >= 2.2.36])
 
 # Misc variable replacements for below Summary
@@ -55,8 +57,8 @@ cat <<EOF
   System environment....: ${sysconfig_path:-${sysconfig}}
   C Compiler............: $CC $CFLAGS $CPPFLAGS $LDFLAGS $LIBS
   Linker................: $LD $LLDP_LDFLAGS $LLDP_BIN_LDFLAGS $LDFLAGS $LIBS
-  CFLAGS................: $libite_CFLAGS $sysrepo_CFLAGS
-  LIBS..................: $libite_LIBS $sysrepo_LIBS
+  CFLAGS................: $libite_CFLAGS $libyang_CFLAGS $sysrepo_CFLAGS
+  LIBS..................: $libite_LIBS $libyang_LIBS $sysrepo_LIBS
 
 ------------- Compiler version --------------
 $($CC --version || true)

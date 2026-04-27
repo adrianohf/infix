@@ -6,7 +6,7 @@ like Message of the Day (login message) and user login shell.  More
 on this later on in this document.
 
 For the sake of brevity, the hostname in the following examples has been
-shortened to `host`.  The default hostname is composed from a product
+shortened to `example`.  The default hostname is composed from a product
 specific string followed by the last three octets of the system base MAC
 address, e.g., `switch-12-34-56`.  An example of how to change the
 hostname is included below.
@@ -22,13 +22,12 @@ hostname is included below.
 User management, including passwords, SSH keys, remote authentication is
 available in the system authentication configuration context.
 
-```
-admin@host:/config/> edit system authentication user admin
-admin@host:/config/system/authentication/user/admin/> change password
+<pre class="cli"><code>admin@example:/config/> <b>edit system authentication user admin</b>
+admin@example:/config/system/…/user/admin/> <b>change password</b>
 New password:
 Retype password:
-admin@host:/config/system/authentication/user/admin/> leave
-```
+admin@example:/config/system/…/user/admin/> <b>leave</b>
+</code></pre>
 
 The `change password` command starts an interactive dialogue that asks
 for the new password, with a confirmation, and then salts and encrypts
@@ -56,116 +55,331 @@ are supported.
 With SSH keys in place it is possible to disable password login, just
 remember to verify SSH login and network connectivity before doing so.
 
-```
-admin@host:/config/> edit system authentication user admin
-admin@host:/config/system/authentication/user/admin/> edit authorized-key example@host
-admin@host:/config/system/authentication/user/admin/authorized-key/example@host/> set algorithm ssh-rsa
-admin@host:/config/system/authentication/user/admin/authorized-key/example@host/> set key-data AAAAB3NzaC1yc2EAAAADAQABAAABgQC8iBL42yeMBioFay7lty1C4ZDTHcHyo739gc91rTTH8SKvAE4g8Rr97KOz/8PFtOObBrE9G21K7d6UBuPqmd0RUF2CkXXN/eN2PBSHJ50YprRFt/z/304bsBYkDdflKlPDjuSmZ/+OMp4pTsq0R0eNFlX9wcwxEzooIb7VPEdvWE7AYoBRUdf41u3KBHuvjGd1M6QYJtbFLQMMTiVe5IUfyVSZ1RCxEyAB9fR9CBhtVheTVsY3iG0fZc9eCEo89ErDgtGUTJK4Hxt5yCNwI88YaVmkE85cNtw8YwubWQL3/tGZHfbbQ0fynfB4kWNloyRHFr7E1kDxuX5+pbv26EqRdcOVGucNn7hnGU6C1+ejLWdBD7vgsoilFrEaBWF41elJEPKDzpszEijQ9gTrrWeYOQ+x++lvmOdssDu4KvGmj2K/MQTL2jJYrMJ7GDzsUu3XikChRL7zNfS2jYYQLzovboUCgqfPUsVba9hqeX3U67GsJo+hy5MG9RSry4+ucHs=
-admin@host:/config/system/authentication/user/admin/authorized-key/example@host/> show
+<pre class="cli"><code>admin@example:/config/> <b>edit system authentication user admin</b>
+admin@example:/config/system/…/user/admin/> <b>edit authorized-key admin@example</b>
+admin@example:/config/system/…/example@host/> <b>set algorithm ssh-rsa</b>
+admin@example:/config/system/…/example@host/> <b>set key-data AAAAB3NzaC1yc2EAAAADAQABAAABgQC8iBL42yeMBioFay7lty1C4ZDTHcHyo739gc91rTTH8SKvAE4g8Rr97KOz/8PFtOObBrE9G21K7d6UBuPqmd0RUF2CkXXN/eN2PBSHJ50YprRFt/z/304bsBYkDdflKlPDjuSmZ/+OMp4pTsq0R0eNFlX9wcwxEzooIb7VPEdvWE7AYoBRUdf41u3KBHuvjGd1M6QYJtbFLQMMTiVe5IUfyVSZ1RCxEyAB9fR9CBhtVheTVsY3iG0fZc9eCEo89ErDgtGUTJK4Hxt5yCNwI88YaVmkE85cNtw8YwubWQL3/tGZHfbbQ0fynfB4kWNloyRHFr7E1kDxuX5+pbv26EqRdcOVGucNn7hnGU6C1+ejLWdBD7vgsoilFrEaBWF41elJEPKDzpszEijQ9gTrrWeYOQ+x++lvmOdssDu4KvGmj2K/MQTL2jJYrMJ7GDzsUu3XikChRL7zNfS2jYYQLzovboUCgqfPUsVba9hqeX3U67GsJo+hy5MG9RSry4+ucHs=</b>
+admin@example:/config/system/…/example@host/> <b>show</b>
 algorithm ssh-rsa;
 key-data AAAAB3NzaC1yc2EAAAADAQABAAABgQC8iBL42yeMBioFay7lty1C4ZDTHcHyo739gc91rTTH8SKvAE4g8Rr97KOz/8PFtOObBrE9G21K7d6UBuPqmd0RUF2CkXXN/eN2PBSHJ50YprRFt/z/304bsBYkDdflKlPDjuSmZ/+OMp4pTsq0R0eNFlX9wcwxEzooIb7VPEdvWE7AYoBRUdf41u3KBHuvjGd1M6QYJtbFLQMMTiVe5IUfyVSZ1RCxEyAB9fR9CBhtVheTVsY3iG0fZc9eCEo89ErDgtGUTJK4Hxt5yCNwI88YaVmkE85cNtw8YwubWQL3/tGZHfbbQ0fynfB4kWNloyRHFr7E1kDxuX5+pbv26EqRdcOVGucNn7hnGU6C1+ejLWdBD7vgsoilFrEaBWF41elJEPKDzpszEijQ9gTrrWeYOQ+x++lvmOdssDu4KvGmj2K/MQTL2jJYrMJ7GDzsUu3XikChRL7zNfS2jYYQLzovboUCgqfPUsVba9hqeX3U67GsJo+hy5MG9RSry4+ucHs=;
-admin@host:/config/system/authentication/user/admin/authorized-key/example@host/> leave
-```
+admin@example:/config/system/…/example@host/> <b>leave</b>
+</code></pre>
 
 > [!NOTE]
 > The `ssh-keygen` program already base64 encodes the public key data,
 > so there is no need to use the `text-editor` command, `set` does the
 > job.
 
-
 ## Multiple Users
 
-The system supports multiple users and multiple user levels, or groups,
-that a user can be a member of.  Access control is entirely handled by
-the NETCONF ["NACM"][3] YANG model, which provides granular access to
-configuration, data, and RPC commands over NETCONF.
+The factory configuration provides three hierarchical user group levels by
+default: **guest ⊂ operator ⊂ admin**.  These levels work out-of-the-box
+with sensible permissions - operators can configure the system immediately,
+while sensitive items (passwords, cryptographic keys) remain protected.
 
-By default the system ships with a single group, `admin`, which the
-default user `admin` is a member of.  The broad permissions granted by
-the `admin` group is what gives its users full system administrator
-privileges.  There are no restrictions on the number of users with
-administrator privileges, nor is the `admin` user reserved or protected
-in any way -- it is completely possible to remove the default `admin`
-user from the configuration.  However, it is recommended to keep at
-least one user with administrator privileges in the system, otherwise
-the only way to regain full access is to perform a *factory reset*.
+The default levels provide different access to system resources and
+configuration:
+
+- **Admin**: Full system access - can manage users, upgrade software,
+  restart the system, and modify all configuration including network
+  settings, routing, and firewall rules.
+
+- **Operator**: Configuration access - can modify most system settings
+  including network interfaces, routing, firewall, hostname, and more.
+  *Cannot access* password hashes, cryptographic keys, or perform
+  sensitive operations (factory reset, software upgrade).
+
+- **Guest**: Read-only access - can view operational state and
+  configuration but cannot modify anything or execute operations.
+
+System access control is handled by the [ietf-netconf-acm][3] YANG model,
+usually referred to as [NACM](nacm.md), which provides granular access to
+configuration, data, and RPC commands.  The hierarchical levels in the system
+are determined by:
+
+1. **NACM permissions** - what the user can access
+2. **Shell setting** - which command-line interface the user can use
+
+By default the system ships with a single user, `admin`, in the `admin`
+group.  There are no restrictions on the number of users with admin
+privileges, nor is the `admin` user reserved or protected -- it can be
+removed from the configuration.  However, it is strongly recommended to
+keep at least one user with administrator privileges, otherwise the only
+way to regain full access is to perform a *factory reset*.
+
+For an overview of users and groups on the system, there is an admin-exec
+command:
+
+<pre class="cli"><code>admin@example:/> <b>show nacm</b>
+enabled              : yes
+default read access  : permit
+default write access : permit
+default exec access  : permit
+denied operations    : 0
+denied data writes   : 0
+denied notifications : 0
+
+          ┌──────────┬─────────┬─────────┬─────────┐
+          │ GROUP    │  READ   │  WRITE  │  EXEC   │
+          ├──────────┼─────────┼─────────┼─────────┤
+          │ admin    │    ✓    │    ✓    │    ✓    │
+          │ operator │    ⚠    │    ⚠    │    ⚠    │
+          │ guest    │    ⚠    │    ✗    │    ✗    │
+          └──────────┴─────────┴─────────┴─────────┘
+              ✓ Full    ⚠ Restricted    ✗ Denied
+
+<span class="header">USER                   SHELL   LOGIN                            </span>
+admin                  bash    password+key
+jacky                  clish   password
+monitor                false   key
+
+<span class="header">GROUP                  USERS                                    </span>
+admin                  admin
+operator               jacky
+guest                  monitor
+</code></pre>
+
+The permissions matrix shows effective access for each NACM group:
+
+- **✓ Full** (green) - unrestricted access
+- **⚠ Restricted** (yellow) - access with exceptions, use `show nacm group`
+  for details
+- **✗ Denied** (red) - no access
+
+For detailed information about a specific group's rules:
+
+<pre class="cli"><code>admin@example:/> <b>show nacm group operator</b>
+members          : jacky
+read permission  : restricted
+write permission : restricted
+exec permission  : restricted
+applicable rules : 4
+──────────────────────────────────────────────────────────────────────
+<span class="title">permit-system-rpcs</span>
+  action     : permit
+  operations : exec
+  target     : ietf-system (rpc: *)
+  comment    : Operators can reboot, shutdown, and set system time.
+
+──────────────────────────────────────────────────────────────────────
+<span class="title">deny-password-access (via '*')</span>
+  action     : deny
+  operations : *
+  target     : /ietf-system:system/authentication/user/password
+  comment    : No user except admins can access password hashes.
+
+──────────────────────────────────────────────────────────────────────
+<span class="title">deny-keystore-access (via '*')</span>
+  action     : deny
+  operations : *
+  target     : ietf-keystore
+  comment    : No user except admins can access cryptographic keys.
+
+──────────────────────────────────────────────────────────────────────
+<span class="title">deny-truststore-access (via '*')</span>
+  action     : deny
+  operations : *
+  target     : ietf-truststore
+  comment    : No user except admins can access trust store.
+</code></pre>
+
+For user details:
+
+<pre class="cli"><code>admin@example:/> <b>show nacm user jacky</b>
+shell            : clish
+login            : password
+nacm group       : operator
+read permission  : restricted
+write permission : restricted
+exec permission  : restricted
+
+For detailed rules, use: show nacm group &lt;name&gt;
+</code></pre>
 
 ### Adding a User
 
-Similar to how to change password, adding a new user is done using the
-same set of commands:
+Creating a new user starts with defining the user account in the system:
 
-```
-admin@host:/config/> edit system authentication user jacky
-admin@host:/config/system/authentication/user/jacky/> change password
+<pre class="cli"><code>admin@example:/config/> <b>edit system authentication user jacky</b>
+admin@example:/config/system/…/user/jacky/> <b>change password</b>
 New password:
 Retype password:
-admin@host:/config/system/authentication/user/jacky/> leave
-```
+admin@example:/config/system/…/user/jacky/> <b>leave</b>
+</code></pre>
 
-An authorized SSH key is added the same way as presented previously.
+> [!TIP]
+> It is also possible to use <kbd>set password ...</kbd> if you have the
+> fully crypted and salted string ready.  This can be created offline
+> with the [`mkpasswd(1)`][5] tool, or the built-in CLI version <kbd>do
+> password encrypt [OPTS]</kbd>.  The `do` prefix is handy for reaching
+> all top-level commands when in configure context.
 
-### Adding a User to the Admin Group
+An authorized SSH key can be added the same way as described in the
+previous sections.
 
-The following commands add user `jacky` to the `admin` group.
+By default, shell access is disabled (`shell false`).  To allow CLI/SSH
+access, set the shell:
 
-```
-admin@host:/config/> edit nacm group admin
-admin@host:/config/nacm/group/admin/> set user-name jacky
-admin@host:/config/nacm/group/admin/> leave
-```
+<pre class="cli"><code>admin@example:/config/> <b>edit system authentication user jacky</b>
+admin@example:/config/system/…/user/jacky/> <b>set shell clish</b>
+admin@example:/config/system/…/user/jacky/> <b>leave</b>
+</code></pre>
+
+Available shells:
+
+- `bash` - Full Bourne-again shell (recommended for admins only)
+- `sh` - POSIX shell (recommended for admins only)
+- `clish` - Limited CLI-only shell (recommended for operators and guests)
+- `false` - No shell access (default)
+
+> [!WARNING] Security Notice
+> For security reasons, it is strongly recommended to limit non-admin users
+> to the `clish` shell, which provides CLI access without exposing the
+> underlying UNIX system.  Reserve `bash` and `sh` for administrators who
+> need full system access for debugging and maintenance.
+>
+> Note that shell and CLI access is not always necessary - the system
+> supports NETCONF and RESTCONF for remote management and automation.
+> Setting `shell false` for users who only need programmatic access
+> minimizes the attack surface and improves overall system security.
+
+### Adding a User to a Group
+
+To assign a user to a specific privilege level, add them to the
+corresponding NACM group:
+
+**Operator user:**
+
+<pre class="cli"><code>admin@example:/config/> <b>edit nacm group operator</b>
+admin@example:/config/nacm/group/operator/> <b>set user-name jacky</b>
+admin@example:/config/nacm/group/operator/> <b>leave</b>
+</code></pre>
+
+**Adding another admin:**
+
+<pre class="cli"><code>admin@example:/config/> <b>edit nacm group admin</b>
+admin@example:/config/nacm/group/admin/> <b>set user-name alice</b>
+admin@example:/config/nacm/group/admin/> <b>leave</b>
+</code></pre>
+
+**Guest user:**
+
+<pre class="cli"><code>admin@example:/config/> <b>edit nacm group guest</b>
+admin@example:/config/nacm/group/guest/> <b>set user-name monitor</b>
+admin@example:/config/nacm/group/guest/> <b>leave</b>
+</code></pre>
+
+> [!TIP]
+> For technical details about NACM rule evaluation, module-name vs path
+> matching, and creating custom access control policies, see the
+> [NACM Technical Guide](nacm.md).
+
+### Access Control Matrix
+
+The following table shows what each user level can do based on the NACM rules
+and shell access configured for each user:
+
+- **Admin**: `bash` — full system access
+- **Operator**: `clish` — CLI-only access without UNIX system exposure
+- **Guest**: `false` — no shell access
+
+| Feature                | Admin | Operator | Guest     |
+|------------------------|-------|----------|-----------|
+| Network interfaces     | ✓     | ✓        | Read only |
+| Routing (FRR)          | ✓     | ✓        | Read only |
+| Firewall rules         | ✓     | ✓        | Read only |
+| VLANs/bridges          | ✓     | ✓        | Read only |
+| Containers             | ✓     | ✓        | Read only |
+| Hostname/system config | ✓     | ✓        | Read only |
+| CLI/SSH access         | ✓     | ✓        | ✗         |
+| System restart         | ✓     | ✓        | ✗         |
+| Set date/time          | ✓     | ✓        | ✗         |
+| System reboot          | ✓     | ✓        | ✗         |
+| System shutdown        | ✓     | ✓        | ✗         |
+| User management        | ✓     | ✗        | Read only |
+| Keystore (certs/keys)  | ✓     | ✗        | ✗         |
+| Truststore             | ✓     | ✗        | ✗         |
+| Read passwords/secrets | ✓     | ✗        | ✗         |
+| NACM rules             | ✓     | ✗        | ✗         |
+| Factory reset          | ✓     | ✗        | ✗         |
+| Software upgrade       | ✓     | ✗        | ✗         |
 
 ### Security Aspects
 
-The NACM user levels apply primarily to NETCONF, with exception of the
-`admin` group which is granted full system administrator privileges to
-the underlying UNIX system with the following ACL rules:
+The three default user levels are implemented through a combination of NACM
+rules and UNIX group membership.  Access control is permission-based, not
+name-based - the system detects user levels by examining their NACM
+permissions and shell settings.
+
+**Admin users** have unrestricted NACM access with the following rule:
 
 ```json
-   ...
    "module-name": "*",
    "access-operations": "*",
-   "action": "permit",
-   ...
+   "action": "permit"
 ```
 
-A user in the `admin` group is allowed to also use a POSIX login shell
-and use the `sudo` command to perform system administrative commands.
-This makes it possible to use all the underlying UNIX tooling, which
-to many can be very useful, in particular when debugging a system, but
-please remember to use with care -- the system is not built to require
-managing from the shell.  The tools available in the CLI and automated
-services, started from the system's configuration, are the recommended
-way of using the system, in addition to NETCONF tooling.
+Admin users are automatically added to the UNIX `wheel` and `frrvty`
+groups, granting them `sudo` privileges and access to FRR routing
+protocols. This makes it possible to use all the underlying UNIX
+tooling, which can be very useful for debugging, but please use with
+care -- the system is designed to be managed through the CLI and
+NETCONF, not directly via shell commands.
 
+**Operator users** use the permit-by-default NACM model (`write-default:
+"permit"`), which means they can configure most system settings without
+explicit permit rules. This design is "future proof" - when new features
+are added, operators can immediately use them.
+
+The following are explicitly denied to operators through global NACM rules:
+
+- Password hashes (`/ietf-system:system/authentication/user/password`)
+- Cryptographic keys (`ietf-keystore` module)
+- Trust store certificates (`ietf-truststore` module)
+
+Additionally, sensitive operations like factory reset, software upgrades,
+and system shutdown are protected by YANG-level `nacm:default-deny-all`
+annotations and remain restricted to administrators.
+
+Operators are automatically added to the UNIX `operator` and `frrvty`
+groups, granting them `sudo` privileges for network operations and FRR
+access.
+
+**Guest users** have read-only NACM access through an explicit deny rule
+that blocks all write and exec operations (`create update delete exec`),
+while `read-default: "permit"` allows viewing configuration and state.
+Guests receive no special UNIX group memberships. The shell setting
+determines whether guests can access the CLI (`clish`) or are restricted
+from shell access entirely (`false`).
+
+All users, regardless of level, are denied access to password hashes and
+cryptographic key material through global NACM rules.
 
 ## Changing Hostname
 
 Notice how the hostname in the prompt does not change until the change
 is committed by issuing the `leave` command.
 
-```
-admin@host:/config/> edit system
-admin@host:/config/system/> set hostname example
-admin@host:/config/system/> leave
-admin@example:/>
-```
+<pre class="cli"><code>admin@example:/config/> <b>edit system</b>
+admin@example:/config/system/> <b>set hostname myrouter</b>
+admin@example:/config/system/> <b>leave</b>
+admin@myrouter:/>
+</code></pre>
 
 The hostname is advertised over mDNS-SD in the `.local` domain.  If
-another device already has claimed the `example.local` CNAME, in our
+another device already has claimed the `myrouter.local` CNAME, in our
 case, mDNS will advertise a "uniqified" variant, usually suffixing with
-an index, e.g., `example-1.local`.  Use an mDNS browser to scan for
+an index, e.g., `myrouter-1.local`.  Use an mDNS browser to scan for
 available devices on your LAN.
 
 In some cases you may want to set the device's *domain name* as well.
 This is handled the same way:
 
-```
-admin@host:/config/> edit system
-admin@host:/config/system/> set hostname foo.example.com
-admin@host:/config/system/> leave
+<pre class="cli"><code>admin@example:/config/> <b>edit system</b>
+admin@example:/config/system/> <b>set hostname foo.example.com</b>
+admin@example:/config/system/> <b>leave</b>
 admin@foo:/>
-```
+</code></pre>
 
 Both host and domain name are stored in the system files `/etc/hosts`
 and `/etc/hostname`.  The latter is exclusively for the host name.  The
@@ -187,12 +401,11 @@ built-in [`text-editor` command](cli/text-editor.md).
 > See the next section for how to change the editor used to something
 > you may be more familiar with.
 
-```
-admin@host:/config/> edit system
-admin@host:/config/system/> text-editor motd-banner
-admin@host:/config/system/> leave
-admin@host:/>
-```
+<pre class="cli"><code>admin@example:/config/> <b>edit system</b>
+admin@example:/config/system/> <b>text-editor motd-banner</b>
+admin@example:/config/system/> <b>leave</b>
+admin@example:/>
+</code></pre>
 
 Log out and log back in again to inspect the changes.
 
@@ -208,13 +421,12 @@ as the `text-editor` command:
 
 To change the editor to GNU Nano:
 
-```
-admin@host:/> configure
-admin@host:/config/> edit system
-admin@host:/config/system/> set text-editor nano
-admin@host:/config/system/> leave
-admin@host:/>
-```
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit system</b>
+admin@example:/config/system/> <b>set text-editor nano</b>
+admin@example:/config/system/> <b>leave</b>
+admin@example:/>
+</code></pre>
 
 > [!IMPORTANT]
 > Configuration changes only take effect after issuing the `leave`
@@ -228,18 +440,17 @@ The system supports both static and dynamic (DHCP) DNS setup.  The
 locally configured (static) server is preferred over any acquired
 from a DHCP client.
 
-```
-admin@host:/> configure
-admin@host:/config/> edit system dns-resolver
-admin@host:/config/system/dns-resolver/> set server google udp-and-tcp address 8.8.8.8
-admin@host:/config/system/dns-resolver/> show
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit system dns-resolver</b>
+admin@example:/config/system/dns-resolver/> <b>set server google udp-and-tcp address 8.8.8.8</b>
+admin@example:/config/system/dns-resolver/> <b>show</b>
 server google {
   udp-and-tcp {
     address 8.8.8.8;
   }
 }
-admin@host:/config/system/dns-resolver/> leave
-```
+admin@example:/config/system/dns-resolver/> <b>leave</b>
+</code></pre>
 
 It is also possible to configure resolver options like timeout and
 retry attempts.  See the YANG model for details, or use the built-in
@@ -256,16 +467,15 @@ help system in the CLI.
 Below is an example configuration for enabling NTP with a specific
 server and the `iburst` option for faster initial synchronization.
 
-```
-admin@host:/> configure
-admin@host:/config/> edit system ntp
-admin@host:/config/system/ntp/> set enabled
-admin@host:/config/system/ntp/> set server ntp-pool
-admin@host:/config/system/ntp/> set server ntp-pool udp address pool.ntp.org
-admin@host:/config/system/ntp/> set server ntp-pool iburst
-admin@host:/config/system/ntp/> set server ntp-pool prefer
-admin@host:/config/system/ntp/> leave
-```
+<pre class="cli"><code>admin@example:/> <b>configure</b>
+admin@example:/config/> <b>edit system ntp</b>
+admin@example:/config/system/ntp/> <b>set enabled</b>
+admin@example:/config/system/ntp/> <b>set server ntp-pool</b>
+admin@example:/config/system/ntp/> <b>set server ntp-pool udp address pool.ntp.org</b>
+admin@example:/config/system/ntp/> <b>set server ntp-pool iburst</b>
+admin@example:/config/system/ntp/> <b>set server ntp-pool prefer</b>
+admin@example:/config/system/ntp/> <b>leave</b>
+</code></pre>
 
 This configuration enables the NTP client and sets the NTP server to
 `pool.ntp.org` with the `iburst` and `prefer` options. The `iburst`
@@ -285,36 +495,38 @@ The status for NTP sources is availble in YANG and accessable with
 CLI/NETCONF/RESTCONF.
 
 To view the sources being used by the NTP client, run:
-```
-admin@target:/> show ntp
-ADDRESS         MODE         STATE            STRATUM POLL-INTERVAL
-192.168.1.1     server       candidate              1             6
-192.168.2.1     server       candidate              1             6
-192.168.3.1     server       selected               1             6
-```
+
+<pre class="cli"><code>admin@example:/> <b>show ntp</b>
+Mode                : Client
+Stratum             : 3
+Ref time (UTC)      : Sat Jan 24 23:41:42 2026
+
+<span class="header">ADDRESS         MODE    STATE     STRATUM  POLL</span>
+147.78.228.41   server  outlier         2   64s
+192.168.0.1     server  unusable        0  128s
+176.126.86.247  server  selected        2   64s
+</code></pre>
 
 ### Show NTP Status
 
 To check the status of NTP synchronization (only availble in CLI), use
 the following command:
 
-```
-admin@host:/> show ntp tracking
-Reference ID    : C0248F86 (192.36.143.134)
-Stratum         : 2
-Ref time (UTC)  : Mon Oct 21 10:06:45 2024
-System time     : 0.000000001 seconds slow of NTP time
-Last offset     : -3845.151367188 seconds
-RMS offset      : 3845.151367188 seconds
-Frequency       : 4.599 ppm slow
-Residual freq   : +1293.526 ppm
-Skew            : 12.403 ppm
-Root delay      : 1.024467230 seconds
-Root dispersion : 0.273462683 seconds
-Update interval : 0.0 seconds
-Leap status     : Normal
-admin@host:/>
-```
+<pre class="cli"><code>admin@example:/> <b>show ntp tracking</b>
+Reference ID        : 176.126.86.247
+Stratum             : 3
+Ref time (UTC)      : Sat Jan 24 23:41:42 2026
+System time         : 0.000000 seconds slow of NTP time
+Last offset         : -454779.375000000 seconds
+RMS offset          : 454779.375000000 seconds
+Frequency           : 0.000 ppm slow
+Residual freq       : -26.383 ppm
+Skew                : 1000000.000 ppm
+Root delay          : 0.007395 seconds
+Root dispersion     : 39.181149 seconds
+Update interval     : 0.0 seconds
+Leap status         : Normal
+</code></pre>
 
 This output provides detailed information about the NTP status, including
 reference ID, stratum, time offsets, frequency, and root delay.
@@ -323,368 +535,8 @@ reference ID, stratum, time offsets, frequency, and root delay.
 > The system uses `chronyd` Network Time Protocol (NTP) daemon.  The
 > output shown here is best explained in the [Chrony documentation][4].
 
-## Upgrade procedures and boot order
-
-For resilience purposes, Infix maintains two software
-images referred to as the _primary_ and _secondary_ partition image.
-In addition, some bootloaders support [netbooting][6].
-
-The _boot order_ defines which image is tried first, and is listed
-with the CLI `show software` command. It also shows Infix version
-installed per partition, and which image was used when booting (`STATE
-booted`).
-
-```
-admin@example:/> show software
-BOOT ORDER
-primary secondary net
-
-NAME      STATE     VERSION                DATE
-primary   booted    v25.01.0               2025-04-25T10:15:00+00:00
-secondary inactive  v25.01.0               2025-04-25T10:07:20+00:00
-admin@example:/>
-```
-
-YANG support for upgrading Infix, inspecting and _modifying_ the
-boot-order, is defined in [infix-system-software][5].
-
-
-### Upgrading Infix
-
-Upgrading Infix is done one partition at a time. If the system has
-booted from one partition, an `upgrade` will apply to the other
-(inactive) partition.
-
-1. Download and unpack the release to install. Make the image *pkg*
-   bundle available at some URL[^10]
-2. Assume the unit has booted the `primary` image. Then running the
-   `upgrade` command installs a new image on the `secondary`
-   partition
-3. As part of a successful upgrade, the boot-order is implictly
-   changed to boot the newly installed image
-4. Reboot the unit
-5. The unit now runs the new image. To upgrade the remaining partition
-   (`primary`), run the same upgrade command again, and (optionally)
-   reboot to verify the upgrade
-   
-> [!CAUTION]
-> During boot, the unit may [migrate](#configuration-migration) the
-> startup configuration for any syntax changes.  It is therefore
-> important that you make sure to upgrade the other partition as well
-> after reboot, of course after having verified your setup.
-
-The CLI example below shows steps 2-4.
-
-Upgrade: here the image *pkg bundle* was made available via TFTP.
-
-```
-admin@example:/> upgrade tftp://198.18.117.1/infix-aarch64-25.03.1.pkg
-installing
-  0% Installing
-  0% Determining slot states
- 10% Determining slot states done.
-...
- 98% Copying image to rootfs.1
- 99% Copying image to rootfs.1
- 99% Copying image to rootfs.1 done.
- 99% Updating slots done.
-100% Installing done.
-Installing `tftp://198.18.117.1/infix-aarch64-25.03.1.pkg` succeeded
-admin@example:/>
-```
-
-Reboot: The unit will boot on the other partition, with the newly
-installed image. The `Loading startup-config` step conducts migration
-of startup configuration if applicable.
-
-```
-admin@example:/> reboot
-[ OK ] Stopping Static routing daemon
-[ OK ] Stopping Zebra routing daemon
-...
-[ OK ] Loading startup-config
-[ OK ] Verifying self-signed https certificate
-[ OK ] Update DNS configuration
-[ OK ] Starting Status daemon
-
-Infix -- a Network Operating System v25.03.1 (ttyS0)
-example login: admin
-Password:
-.-------.
-|  . .  | Infix -- a Network Operating System
-|-. v .-| https://kernelkit.org
-'-'---'-'
-
-Run the command 'cli' for interactive OAM
-
-admin@example:~$ cli
-
-See the 'help' command for an introduction to the system
-
-admin@example:/> show software
-BOOT ORDER
-secondary primary net
-
-NAME      STATE     VERSION                DATE
-primary   inactive  v25.01.0               2025-04-25T10:15:00+00:00
-secondary booted    v25.03.1               2025-04-25T10:24:31+00:00
-admin@example:/>
-```
-
-As shown, the *boot order* has been updated, so that *secondary* is
-now the preferred boot source.
-
-To upgrade the remaining partition (`primary`), run the `upgrade URL`
-command again, and reboot.
-
-### Configuration Migration
-
-The example above illustrated an upgrade from Infix v25.01.0 to
-v25.03.1. Inbetween these versions, YANG configuration definitions
-changed slightly (more details given below).
-
-During boot, Infix inspects the `version` meta information within the
-startup configuration file to determine if configuration migration is
-needed. In this specific case, the configuration file has version
-`1.4` while the booted software expects version `1.5` (the
-configuration version numbering differs from the Infix image version
-numbering).  The startup configuration is migrated to `1.5`
-definitions and stored, while a backup previous startup configuration
-is stored in directory `/cfg/backup/`.
-
-```
-admin@example:/> dir /cfg/backup/
-/cfg/backup/ directory
-startup-config-1.4.cfg
-
-admin@example:/>
-```
-
-The modifications made to the startup configuration can be viewed by
-comparing the files from the *shell*. An example is shown below.
-
-```
-admin@example:/> exit
-admin@example:~$ diff /cfg/backup/startup-config-1.4.cfg /cfg/startup-config.cfg
---- /cfg/backup/startup-config-1.4.cfg
-+++ /cfg/startup-config.cfg
-...
--          "public-key-format": "ietf-crypto-types:ssh-public-key-format",
-+          "public-key-format": "infix-crypto-types:ssh-public-key-format",
-...
--          "private-key-format": "ietf-crypto-types:rsa-private-key-format",
-+          "private-key-format": "infix-crypto-types:rsa-private-key-format",
-...
--    "version": "1.4"
-+    "version": "1.5"
-...
-admin@example:~$
-```
-
-### Downgrading Infix
-
-Downgrading to an earlier Infix version is possible, however,
-downgrading is **not** guaranteed to work smoothly. In particular,
-when the unit boots up with the downgraded version, it may fail to
-apply the *startup config*, and instead apply its [failure config][7].
-
-We consider two cases: downgrading with or without applying a backup
-startup configuration before rebooting.
-
-In both cases we start out with a unit running Infix v25.03.1, and
-wish to downgrade to v25.01.0.
-
-```
-admin@example:/> show software
-BOOT ORDER
-primary secondary net
-
-NAME      STATE     VERSION                DATE
-primary   booted    v25.03.1               2025-04-25T11:36:26+00:00
-secondary inactive  v25.03.1               2025-04-25T10:24:31+00:00
-admin@example:/>
-```
-
-#### Downgrading when applying a backup startup configuration
-
-This is the recommended approach to downgrade, given that you have a
-backup configuration available.  The objective is to avoid ending up
-with the unit in *failure config*.
-
-1. Find the backup configuration file.
-2. Run `upgrade URL` to install Infix image to downgrade to.
-3. Copy backup startup configuration to current startup configuration
-   (from shell).
-4. Reboot.
-
-*Find the backup configuration file:*
-
-Assume you have a backup startup config for the version to downgrade
-to (here Infix v25.01.0, config `version 1.4`).
-
-```
-admin@example:/> dir /cfg/backup/
-/cfg/backup/ directory
-startup-config-1.4.cfg
-
-admin@example:/>
-```
-
-*Use `upgrade` command to downgrade:*
-
-```
-admin@example:/> upgrade tftp://198.18.117.1/infix-aarch64-25.01.0.pkg
-installing
-  0% Installing
-  0% Determining slot states
- 10% Determining slot states done.
- ...
- 99% Copying image to rootfs.1 done.
- 99% Updating slots done.
-100% Installing done.
-Installing `tftp://198.18.117.1/infix-aarch64-25.01.0.pkg` succeeded
-admin@example:/>
-```
-
-*Apply the backup configuration file:*
-
-```
-admin@example:/> copy /cfg/backup/startup-config-1.4.cfg /cfg/startup-config.cfg
-Overwrite existing file /cfg/startup-config.cfg (y/N)? y
-admin@example:/>
-```
-
-*Reboot:*
-
-The unit will come up with the applied backup configuration instead of
-failure config.
-
-```
-admin@example:/> reboot
-[ OK ] Saving system clock to file
-[ OK ] Stopping Software update service
-[ OK ] Stopping Status daemon
-...
-[ OK ] Bootstrapping YANG datastore
-[ OK ] Starting Configuration daemon
-[ OK ] Loading startup-config
-[ OK ] Update DNS configuration
-[ OK ] Verifying self-signed https certificate
-[ OK ] Starting Status daemon
-
-Infix -- a Network Operating System v25.01.0 (ttyS0)
-example login:
-```
-
-#### Downgrading without applying a backup startup configuration
-
-This procedure assumes you have access to the unit's console port and
-its default login credentials[^9].
-
-1. Downgrade
-2. Reboot
-3. Login with unit's default credentials
-4. Conduct factory reset
-5. (Then go on configure the unit as you wish)
-
-*Use `upgrade` command to downgrade:*
-
-```
-admin@example:/> upgrade tftp://198.18.117.1/infix-aarch64-25.01.0.pkg
-installing
-  0% Installing
-  0% Determining slot states
- 10% Determining slot states done.
- ...
- 99% Copying image to rootfs.1 done.
- 99% Updating slots done.
-100% Installing done.
-Installing `tftp://198.18.117.1/infix-aarch64-25.01.0.pkg` succeeded
-admin@example:/>
-```
-
-*Reboot:*
-
-Conduct a reboot. During boot, the unit fails to apply the existing
-startup configuration (config version `1.5` while software expects
-version `1.4` or earlier), and instead applies its [failure
-config][7]. This is what is seen on the console when this situation
-occurs. Note that the login prompt displays `failed` as part of the
-*hostname*.
-
-```
-admin@example:/> reboot
-[ OK ] Saving system clock to file
-[ OK ] Stopping Software update service
-[ OK ] Stopping Status daemon
-...
-[ OK ] Verifying SSH host keys
-[ OK ] Bootstrapping YANG datastore
-[ OK ] Starting Configuration daemon
-[FAIL] Loading startup-config
-[ OK ] Loading failure-config
-[ OK ] Verifying self-signed https certificate
-[ OK ] Starting Status daemon
-
-Infix -- a Network Operating System v25.01.0 (ttyS0)
-
-ERROR: Corrupt startup-config, system has reverted to default login credentials
-failed-00-00-00 login:
-```
-
-To remedy a situation like this, you can login with the unit's *default
-login credentials*, preferrably via a [console port][8].
-The unit's default credentials are typically printed on a sticker on
-the unit.
-
-```
-failed-00-00-00 login: admin
-Password:
-
-Run the command 'cli' for interactive OAM
-
-admin@failed-00-00-00:~$
-```
-
-When it is *safe* from a network operations perspective, you can
-conduct a factory reset and reboot. It is recommended to remove the
-unit from any production network before doing this, as a factory reset
-may enable undesired connectivity between the unit's ports.
-
-```
-admin@failed-00-00-00:~$ factory
-Factory reset device (y/N)? y
-factory: scheduled factory reset on next boot.
-Reboot now to perform reset, (y/N)? y
-[ OK ] Saving system time (UTC) to RTC
-[ OK ] Stopping mDNS alias advertiser
-...
-[ OK ] Starting Configuration daemon
-[ OK ] Loading startup-config
-[ OK ] Update DNS configuration
-[ OK ] Verifying self-signed https certificate
-[ OK ] Starting Status daemon
-[ OK ] Starting Status daemon
-
-
-Please press Enter to activate this console.
-
-Infix -- a Network Operating System v25.01.0 (ttyS0)
-example login:
-```
-
-Continued configuration is done as with any unit after factory reset.
-
 [1]: https://www.rfc-editor.org/rfc/rfc7317
 [2]: https://github.com/kernelkit/infix/blob/main/src/confd/yang/infix-system%402024-02-29.yang
 [3]: https://www.rfc-editor.org/rfc/rfc8341
 [4]: https://chrony-project.org/doc/4.6.1/chronyc.html
-[5]: https://github.com/kernelkit/infix/blob/main/src/confd/yang/confd/infix-system-software.yang
-[6]: boot.md#system-configuration
-[7]: introduction.md#system-boot
-[8]: management.md#console-port
-[^9]: In failure config, Infix puts all Ethernet ports as individual
-    interfaces. With direct access, one can connect with e.g., SSH,
-    using link local IPv6 addresses. This as an alternative to
-    connecting via a console port.
-[^10]: Set up an FTP/TFTP/SFTP or HTTP/HTTPS server on the same LAN. 
+[5]: https://linux.die.net/man/1/mkpasswd

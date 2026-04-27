@@ -96,6 +96,7 @@ filter_iface_ports()
     iface_devs=""
     for phy in $ifaces; do
         found=""
+        [ -d "/sys/class/net/${phy}/wireless" ] && continue
         for port in $ports; do
             if [ "$port" = "$phy" ]; then
                found=true
@@ -147,7 +148,6 @@ ports=$(ip -d -j link show group port | jq -r '
 
 # Remaining external interfaces not classified as switch ports
 ifaces="$(filter_iface_ports "$phys_ifaces" "$ports")"
-
 cat <<EOF
 {
   "ietf-interfaces:interfaces": {
@@ -169,9 +169,23 @@ if [ -n "$bridge" ]; then
         "name": "$bridge",
         "type": "infix-if-type:bridge",
         "ietf-ip:ipv4": {
-            "infix-ip:autoconf": {
-                "enabled": $ipv4
-            }
+EOF
+    if [ "$ipv4" = "true" ]; then
+        cat <<EOF
+            "infix-ip:autoconf": {}
+EOF
+        if [ "$dhcp" = "true" ]; then
+            cat <<EOF
+            ,
+            "infix-dhcp-client:dhcp": {}
+EOF
+        fi
+    elif [ "$dhcp" = "true" ]; then
+        cat <<EOF
+            "infix-dhcp-client:dhcp": {}
+EOF
+    fi
+    cat <<EOF
         },
         "ietf-ip:ipv6": {
             "enabled": true,
@@ -193,20 +207,8 @@ cat <<EOF
       }
 $(for iface in $ifaces; do gen_iface_json "$iface"; done)
 $(for iface in $ports;  do gen_iface_json "$iface" "$bridge"; done)
-    ]
+      ]
 EOF
-if [ "$dhcp" = "true" ] && [ -n "$bridge" ]; then
-cat <<EOF
-  },
-  "infix-dhcp-client:dhcp-client": {
-    "enabled": true,
-    "client-if": [
-      {
-        "if-name": "$bridge"
-      }
-    ]
-EOF
-fi
 cat <<EOF
   }
 }

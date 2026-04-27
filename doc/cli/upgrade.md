@@ -1,5 +1,4 @@
-Upgrading the Software
-----------------------
+# Upgrading the System
 
 The admin-exec command `upgrade` can be used to install software images, or
 bundles.  A bundle is a signed and self-contained package that carries all the
@@ -11,7 +10,7 @@ use the `upgrade` command and a URI to a ftp/tftp/sftp or http/https server
 that hosts the file:
 
 ```
-admin@host:/> upgrade tftp://192.168.122.1/firmware-x86_64-v23.11.pkg
+admin@example:/> upgrade tftp://192.168.122.1/firmware-x86_64-v23.11.pkg
 installing
   0% Installing
   0% Determining slot states
@@ -32,19 +31,16 @@ installing
  99% Updating slots done.
 100% Installing done.
 Installing `tftp://192.168.122.1/firmware-x86_64-v23.11.pkg` succeeded
-admin@host:/>
+admin@example:/>
 ```
 
 The secondary partition (`rootfs.1`) has now been upgraded and will be used as
 the *active* partition on the next boot.  Leaving the primary partition, with
 the version we are currently running, intact in case of trouble.
 
-See [upgrading procedures and boot order][2] for more information on
-    upgrading.
+See [Upgrade & Boot Order](../upgrade.md) for more information on upgrading.
 
 [^1]: It is not possible to upgrade the partition we booted from.  Thankfully
     the underlying "rauc" subsystem keeps track of this.  Hence, to upgrade
     both partitions you must reboot to the new version (to verify it works)
     and then repeat the same command.
-
-[2]: ../system.md#upgrade-procedures-and-boot-order

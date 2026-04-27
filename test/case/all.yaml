@@ -2,38 +2,63 @@
 - settings:
     test-spec: Readme.adoc
 
-- case: meta/wait.py
-  infamy:
-    specification: False
 - case: meta/reproducible.py
+  name: "Ensure Reproducible Env"
   infamy:
     specification: False
-- name: Misc tests
-  suite: misc/misc.yaml
 
-- name:  ietf-system
-  suite: ietf_system/ietf_system.yaml
+- case: meta/bootorder.py
+  name: "Verify Bootorder"
+  infamy:
+    specification: False
 
-- name:  ietf-syslog
-  suite: ietf_syslog/ietf_syslog.yaml
+- case: meta/check-version.py
+  name: "Verify Software Version"
+  infamy:
+    specification: False
 
-- name:  ietf-interfaces
-  suite: ietf_interfaces/ietf_interfaces.yaml
+- name: "Miscellaneous"
+  suite: misc/all.yaml
 
-- name:  ietf-routing
-  suite: ietf_routing/ietf_routing.yaml
 
-- name:  infix-containers
-  suite: infix_containers/infix_containers.yaml
+- name: "System"
+  suite: system/all.yaml
 
-- name:  infix-dhcp
-  suite: infix_dhcp/infix_dhcp.yaml
+# Upgrade may leave wrong boot order
+- case: meta/bootorder.py
+  name: "Verify Bootorder After Upgrade"
+  infamy:
+    specification: False
 
-- name:  ietf-hardware
-  suite: ietf_hardware/ietf_hardware.yaml
+- name: "Syslog"
+  suite: syslog/all.yaml
 
-- name:  infix-services
-  suite: infix_services/infix_services.yaml
+- name: "Interfaces"
+  suite: interfaces/all.yaml
 
-- name: use-cases
-  suite: use_case/use_case.yml
+- name: "NTP Server"
+  suite: ntp/all.yaml
+
+- name: "PTP"
+  suite: ptp/all.yaml
+
+- name: "Routing"
+  suite: routing/all.yaml
+
+- name: "Firewall"
+  suite: firewall/all.yaml
+
+- name: "Containers"
+  suite: containers/all.yaml
+
+- name: "DHCP"
+  suite: dhcp/all.yaml
+
+- name: "Hardware"
+  suite: hardware/all.yaml
+
+- name: "Services"
+  suite: services/all.yaml
+
+- name: "Use Case Tests"
+  suite: use_case/all.yaml

@@ -113,6 +113,80 @@
   <ACTION sym="STRING"/>
 </PTYPE>
 
+<PTYPE name="FIREWALL_ZONES">
+  <COMPL>
+    <ACTION sym="firewall_zones@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="FIREWALL_POLICIES">
+  <COMPL>
+    <ACTION sym="firewall_policies@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="FIREWALL_SERVICES">
+  <COMPL>
+    <ACTION sym="firewall_services@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="BOOT_TARGET">
+  <COMPL>
+    <ACTION sym="boot_targets@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="USERS">
+  <COMPL>
+    <ACTION sym="users@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="GROUPS">
+  <COMPL>
+    <ACTION sym="groups@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="SYM_KEYS">
+  <COMPL>
+    <ACTION sym="sym_keys@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="ASYM_KEYS">
+  <COMPL>
+    <ACTION sym="asym_keys@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="SSH_KNOWN_HOSTS">
+  <COMPL>
+    <ACTION sym="ssh_known_hosts@infix"/>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
+<PTYPE name="SSH_KEY_TYPE">
+  <COMPL>
+    <ACTION sym="printl">ecdsa-sha2-nistp256</ACTION>
+    <ACTION sym="printl">ecdsa-sha2-nistp384</ACTION>
+    <ACTION sym="printl">ecdsa-sha2-nistp521</ACTION>
+    <ACTION sym="printl">ssh-ed25519</ACTION>
+    <ACTION sym="printl">ssh-rsa</ACTION>
+  </COMPL>
+  <ACTION sym="STRING"/>
+</PTYPE>
+
 <VIEW name="main">
   <HOTKEY key="^D" cmd="exit"/>
 
@@ -167,6 +241,7 @@
   <PARAM name="src" ptype="/DATASTORE"    help="Source datastore or file, e.g., tftp://ip/file"/>
   <PARAM name="dst" ptype="/RW_DATASTORE" help="Destination datastore or file, e.g., scp://ip/file"/>
   <SWITCH name="optional" min="0">
+    <COMMAND name="validate"              help="Validate configuration without applying"/>
     <PARAM name="user" ptype="/STRING"    help="Remote username (interactive password)"/>
   </SWITCH>
   <ACTION sym="copy@infix" in="tty" out="tty" interrupt="true"/>
@@ -209,10 +284,25 @@
       <PARAM name="pwpass" ptype="/STRING" help="Optional clear text password (no spaces)"/>
     </SWITCH>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
-      type=${KLISH_PARAM_pwhash:-sha512}
+      type=${KLISH_PARAM_pwhash:-yescrypt}
       salt=${KLISH_PARAM_pwsalt:+-S $KLISH_PARAM_pwsalt}
       mkpasswd -m $type $salt $KLISH_PARAM_pwpass
     </ACTION>
+  </COMMAND>
+</COMMAND>
+
+<COMMAND name="wireguard" help="WireGuard VPN key tools" mode="switch">
+  <COMMAND name="genkey" help="Generate a WireGuard private/public key pair">
+    <ACTION sym="script">
+priv=$(wg genkey)
+pub=$(printf '%s' "$priv" | wg pubkey)
+echo "Private: $priv"
+echo "Public:  $pub"
+    </ACTION>
+  </COMMAND>
+
+  <COMMAND name="genpsk" help="Generate a WireGuard pre-shared key">
+    <ACTION sym="script">wg genpsk</ACTION>
   </COMMAND>
 </COMMAND>
 
@@ -220,6 +310,22 @@
   <COMMAND name="datetime" help="Set current date and time, ISO-8601 format">
     <PARAM name="current-datetime" ptype="/STRING" help="yyyy-mm-ddThh:mm:ss(Z|+/-hh:mm)"/>
     <ACTION sym="srp_rpc@sysrepo">/ietf-system:set-current-datetime</ACTION>
+  </COMMAND>
+
+  <COMMAND name="boot-order" help="Set boot partition order">
+    <PARAM name="first" ptype="/BOOT_TARGET" help="First boot target"/>
+    <PARAM name="second" ptype="/BOOT_TARGET" help="Second boot target" min="0"/>
+    <PARAM name="third" ptype="/BOOT_TARGET" help="Third boot target" min="0"/>
+    <ACTION sym="set_boot_order@infix"/>
+  </COMMAND>
+
+  <COMMAND name="ssh" help="SSH client settings" mode="switch">
+    <COMMAND name="known-hosts" help="Pre-enroll a host public key received out-of-band">
+      <PARAM name="host"    ptype="/STRING"       help="Hostname or IP address"/>
+      <PARAM name="keytype" ptype="/SSH_KEY_TYPE" help="Public key algorithm"/>
+      <PARAM name="pubkey"  ptype="/STRING"       help="Base64-encoded public key"/>
+      <ACTION sym="ssh_add_known_host@infix"/>
+    </COMMAND>
   </COMMAND>
 </COMMAND>
 
@@ -288,15 +394,54 @@
     </ACTION>
   </COMMAND>
 
-  <COMMAND name="ntp" help="Show NTP (client) status">
-    <ACTION sym="script">
-      show ntp
-    </ACTION>
-    <SWITCH name="optional" min="0">
-      <COMMAND name="tracking" help="Show NTP tracking">
-        <ACTION sym="script">doas ntp tracking</ACTION>
+  <COMMAND name="keystore" help="Show keystore keys">
+    <SWITCH name="subcommands" min="0">
+      <COMMAND name="symmetric" help="Show details for a symmetric key">
+	<PARAM name="name" ptype="/SYM_KEYS" help="Key name"/>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">show keystore symmetric $KLISH_PARAM_name</ACTION>
+      </COMMAND>
+      <COMMAND name="asymmetric" help="Show details for an asymmetric key">
+	<PARAM name="name" ptype="/ASYM_KEYS" help="Key name"/>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">show keystore asymmetric $KLISH_PARAM_name</ACTION>
       </COMMAND>
     </SWITCH>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">show keystore</ACTION>
+  </COMMAND>
+
+  <COMMAND name="nacm" help="Show users and NACM status and groups">
+    <SWITCH name="subcommands" min="0">
+      <COMMAND name="group" help="Show details for a specific NACM group">
+	<PARAM name="name" ptype="/GROUPS" help="Group name"/>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">show nacm group $KLISH_PARAM_name</ACTION>
+      </COMMAND>
+      <COMMAND name="user" help="Show NACM details for a specific user">
+	<PARAM name="name" ptype="/USERS" help="User name"/>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">show nacm user $KLISH_PARAM_name</ACTION>
+      </COMMAND>
+    </SWITCH>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">show nacm</ACTION>
+  </COMMAND>
+
+  <COMMAND name="ptp" help="Show PTP (IEEE 1588/802.1AS) status">
+    <SWITCH name="optional" min="0" max="1">
+      <PARAM name="instance" ptype="/INT" help="Show specific PTP instance (instance-index)"/>
+    </SWITCH>
+    <ACTION sym="script">show ptp $KLISH_PARAM_instance</ACTION>
+  </COMMAND>
+
+  <COMMAND name="ntp" help="Show NTP status">
+    <SWITCH name="subcommands" min="0">
+      <COMMAND name="source" help="Show NTP source(s)">
+	<SWITCH name="optional" min="0" max="1">
+	  <PARAM name="address" ptype="/STRING" help="Show details for specific source address"/>
+	</SWITCH>
+        <ACTION sym="script">show ntp source $KLISH_PARAM_address</ACTION>
+      </COMMAND>
+      <COMMAND name="tracking" help="Show NTP tracking">
+        <ACTION sym="script">show ntp tracking</ACTION>
+      </COMMAND>
+    </SWITCH>
+    <ACTION sym="script">show ntp</ACTION>
   </COMMAND>
 
   <COMMAND name="dhcp-server" help="Show DHCP server status">
@@ -314,11 +459,16 @@
     </SWITCH>
   </COMMAND>
 
+  <COMMAND name="services" help="Show system services">
+    <ACTION sym="script">
+      show services
+    </ACTION>
+  </COMMAND>
+
   <COMMAND name="software" help="Show software info">
     <SWITCH name="optional" min="0" max="1">
       <COMMAND name="name" help="Show detailed info about a partition">
-        <PARAM name="name" ptype="/STRING" help="Partition name">
-        </PARAM>
+        <PARAM name="name" ptype="/STRING" help="Partition name" />
       </COMMAND>
     </SWITCH>
     <ACTION sym="script">
@@ -326,34 +476,74 @@
     </ACTION>
   </COMMAND>
 
-  <COMMAND name="ospf" help="Show OSPF status">
-    <PARAM name="name" ptype="/STRING" help="neighbor, interfaces or bfd" min="0" max="1">
-      <COMPL>
-        <ACTION sym="printl">neighbor</ACTION>
-        <ACTION sym="printl">interfaces</ACTION>
-        <ACTION sym="printl">routes</ACTION>
-        <ACTION sym="printl">database</ACTION>
-        <ACTION sym="printl">bfd</ACTION>
-      </COMPL>
-    </PARAM>
-    <ACTION sym="script" in="tty" out="tty" interrupt="true">
-    if [ -z "$KLISH_PARAM_name" ]; then
-       doas vtysh -c "show-legacy ip ospf" |pager
-    elif [ "$KLISH_PARAM_name" == "neighbor" ];then
-       doas vtysh -c "show-legacy ip ospf neighbor" |pager
-    elif [ "$KLISH_PARAM_name" == "interfaces" ];then
-       doas vtysh -c "show-legacy ip ospf interface" |pager
-    elif [ "$KLISH_PARAM_name" == "routes" ];then
-       doas vtysh -c "show-legacy ip ospf route" |pager
-    elif [ "$KLISH_PARAM_name" == "database" ];then
-       doas vtysh -c "show-legacy ip ospf database" |pager
-    elif [ "$KLISH_PARAM_name" == "bfd" ];then
-       doas vtysh -c "show-legacy bfd peers" |pager
-    fi
+  <COMMAND name="boot-order" help="Show boot partition order">
+    <ACTION sym="script">
+      show boot-order
     </ACTION>
   </COMMAND>
 
-  <COMMAND name="routes" help="Show routing table">
+  <COMMAND name="system" help="Show system overview">
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">
+      show system |pager
+    </ACTION>
+  </COMMAND>
+
+  <COMMAND name="bfd" help="Show BFD information">
+    <PARAM name="subcommand" ptype="/STRING" help="peers or peer" min="0" max="1">
+      <COMPL>
+        <ACTION sym="printl">peers</ACTION>
+        <ACTION sym="printl">peer</ACTION>
+      </COMPL>
+    </PARAM>
+    <PARAM name="peer" ptype="/STRING" help="Peer IP address" min="0" max="1"/>
+    <SWITCH name="optional" min="0">
+      <COMMAND name="brief" help="Show brief output" mode="switch"/>
+    </SWITCH>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">
+      BRIEF_ARG=""
+      if [ -n "$KLISH_COMMAND_brief" ]; then
+        BRIEF_ARG="brief"
+      fi
+      # Pass subcommand, optional peer address, and brief flag
+      show bfd ${KLISH_PARAM_subcommand:+"$KLISH_PARAM_subcommand"} ${KLISH_PARAM_peer:+"$KLISH_PARAM_peer"} ${BRIEF_ARG:+"$BRIEF_ARG"} |pager
+    </ACTION>
+  </COMMAND>
+
+  <COMMAND name="ospf" help="Show OSPF status">
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">
+      show ospf |pager
+      # Deprecated in favor of Cisco likeness, consider future 'show ipv6 ospf'
+      printf "\n\e[1mNOTE:\e[0m this command is deprecated, please use 'show ip ospf' instead.\n"
+    </ACTION>
+
+    <SWITCH name="optional" min="0">
+      <COMMAND name="neighbor" help="Show OSPF neighbors">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          show ospf neighbor |pager
+          printf "\n\e[1mNOTE:\e[0m this command is deprecated, please use 'show ip ospf neighbor' instead.\n"
+        </ACTION>
+      </COMMAND>
+
+      <COMMAND name="interface" help="Show OSPF interfaces">
+        <SWITCH name="optional" min="0" max="1">
+          <PARAM name="ifname" ptype="/IFACES" help="Interface name" />
+        </SWITCH>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          show ospf interface "$KLISH_PARAM_ifname" |pager
+          printf "\n\e[1mNOTE:\e[0m this command is deprecated, please use 'show ip ospf interface' instead.\n"
+        </ACTION>
+      </COMMAND>
+
+      <COMMAND name="route" help="Show OSPF routing table">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          show ospf route |pager
+          printf "\n\e[1mNOTE:\e[0m this command is deprecated, please use 'show ip ospf route' instead.\n"
+        </ACTION>
+      </COMMAND>
+    </SWITCH>
+  </COMMAND>
+
+  <COMMAND name="route" help="Show routing table">
     <PARAM name="ip" ptype="/STRING" help="ipv4 or ipv6" min="0" max="1">
       <COMPL>
         <ACTION sym="printl">ipv4</ACTION>
@@ -361,15 +551,9 @@
       </COMPL>
     </PARAM>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
-      case $KLISH_PARAM_ip in
-        ipv4)
-          KLISH_PARAM_ip=ip
-          ;;
-        ipv6)
-          KLISH_PARAM_ip=ipv6
-          ;;
-      esac
-      show-legacy -p $KLISH_PARAM_ip route |pager
+      show routes $KLISH_PARAM_ip route |pager
+      # Deprecated in favor of Cisco likeness
+      printf "\n\e[1mNOTE:\e[0m this command is deprecated, please use 'show ip route' instead.\n"
     </ACTION>
   </COMMAND>
 
@@ -379,6 +563,10 @@
     </ACTION>
   </COMMAND>
 
+  <COMMAND name="mdns" help="Show mDNS configuration and neighbors">
+    <ACTION sym="script">show mdns</ACTION>
+  </COMMAND>
+
   <COMMAND name="hardware" help="Show hardware information">
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
       show hardware |pager
@@ -386,15 +574,12 @@
   </COMMAND>
 
   <!-- https://www.cisco.com/c/en/us/td/docs/wireless/access_point/mob_exp/83/cmd-ref/me_cr_book/me_ports_and_interfaces_cli.html -->
-  <COMMAND name="interfaces" help="Show interface info">
+  <COMMAND name="interface" help="Show interface info, default an overview of all">
     <SWITCH name="optional" min="0" max="1">
-      <COMMAND name="name" help="Show detailed info about NAME">
-        <PARAM name="name" ptype="/IFACES" help="Interface.">
-        </PARAM>
-      </COMMAND>
+      <PARAM name="ifname" ptype="/IFACES" help="Interface name" />
     </SWITCH>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
-        show interface "$KLISH_PARAM_name" |pager
+      show interface "$KLISH_PARAM_ifname" |pager
     </ACTION>
   </COMMAND>
 
@@ -422,10 +607,68 @@
         </ACTION>
       </COMMAND>
 
-      <COMMAND name="route" help="Show IPv4 routing table" mode="switch">
+      <COMMAND name="route" help="Show routing table">
         <ACTION sym="script" in="tty" out="tty" interrupt="true">
-          show-legacy -p ip route |pager
+	  show routes ipv4 |pager
         </ACTION>
+      </COMMAND>
+
+      <COMMAND name="ospf" help="Show OSPF status">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          show ospf |pager
+        </ACTION>
+
+        <SWITCH name="optional" min="0">
+          <COMMAND name="neighbor" help="Show OSPF neighbors">
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show ospf neighbor |pager
+            </ACTION>
+          </COMMAND>
+
+          <COMMAND name="interface" help="Show OSPF interfaces">
+            <SWITCH name="optional" min="0" max="1">
+              <PARAM name="ifname" ptype="/IFACES" help="Interface name" />
+            </SWITCH>
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show ospf interface "$KLISH_PARAM_ifname" |pager
+            </ACTION>
+          </COMMAND>
+
+          <COMMAND name="route" help="Show OSPF routing table">
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show ospf route |pager
+            </ACTION>
+          </COMMAND>
+        </SWITCH>
+      </COMMAND>
+
+      <COMMAND name="rip" help="Show RIP status">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          show rip |pager
+        </ACTION>
+
+        <SWITCH name="optional" min="0">
+          <COMMAND name="route" help="Show RIP routing table">
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show rip route |pager
+            </ACTION>
+          </COMMAND>
+
+          <COMMAND name="interface" help="Show RIP interfaces">
+            <SWITCH name="optional" min="0" max="1">
+              <PARAM name="ifname" ptype="/IFACES" help="Interface name" />
+            </SWITCH>
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show rip interface "$KLISH_PARAM_ifname" |pager
+            </ACTION>
+          </COMMAND>
+
+          <COMMAND name="neighbor" help="Show RIP neighbors">
+            <ACTION sym="script" in="tty" out="tty" interrupt="true">
+              show rip neighbor |pager
+            </ACTION>
+          </COMMAND>
+        </SWITCH>
       </COMMAND>
     </SWITCH>
   </COMMAND>
@@ -436,9 +679,21 @@
     </ACTION>
 
     <SWITCH name="optional" min="0">
+      <COMMAND name="brief" help="Simplified (human-readable) output" mode="switch">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          ip -color -6 -br addr | sort -V | sed 's/@dsa[0-9]/     /' |pager
+        </ACTION>
+      </COMMAND>
+
+      <COMMAND name="detailed" help="Detailed (full) output" mode="switch">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          ip -color -6 -d addr |pager
+        </ACTION>
+      </COMMAND>
+
       <COMMAND name="route" help="Show IPv6 routing table" mode="switch">
         <ACTION sym="script" in="tty" out="tty" interrupt="true">
-          show-legacy -p ipv6 route |pager
+          show routes ipv6 |pager
         </ACTION>
       </COMMAND>
     </SWITCH>
@@ -482,16 +737,62 @@
   </COMMAND>
 
   <COMMAND name="factory-config" help="Show factory-config">
-    <ACTION sym="script" in="tty" out="tty" interrupt="true">jq -C . /etc/factory-config.cfg |pager</ACTION>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">copy factory | jq -C . |pager</ACTION>
   </COMMAND>
 
   <COMMAND name="running-config" help="Show running-config">
-    <ACTION sym="script" in="tty" out="tty" interrupt="true">sysrepocfg -X -f json | jq -C . |pager</ACTION>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">copy running | jq -C . |pager</ACTION>
   </COMMAND>
 
   <COMMAND name="startup-config" help="Show startup-config">
-    <ACTION sym="script" in="tty" out="tty" interrupt="true">jq -C . /cfg/startup-config.cfg |pager</ACTION>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">copy startup | jq -C . |pager</ACTION>
   </COMMAND>
+
+  <COMMAND name="firewall" help="Show firewall status and configuration">
+    <SWITCH name="optional" min="0" max="1">
+      <COMMAND name="log" help="Show firewall log (jumps to end), alias to 'show log firewall.log'">
+        <SWITCH name="optional" min="0">
+          <PARAM name="limit" ptype="/UINT" help="Last N lines, default: all"/>
+        </SWITCH>
+	<ACTION sym="script" in="tty" out="tty" interrupt="true">
+	  copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall-log $KLISH_PARAM_limit |pager +G
+	</ACTION>
+      </COMMAND>
+      <COMMAND name="matrix" help="Show firewall zone matrix">
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall-matrix
+        </ACTION>
+      </COMMAND>
+      <COMMAND name="zone" help="Show firewall zones">
+        <SWITCH name="optional" min="0">
+          <PARAM name="name" ptype="/FIREWALL_ZONES" help="Zone name"/>
+        </SWITCH>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall-zone "$KLISH_PARAM_name" |pager
+        </ACTION>
+      </COMMAND>
+      <COMMAND name="policy" help="Show firewall policies">
+        <SWITCH name="optional" min="0">
+          <PARAM name="name" ptype="/FIREWALL_POLICIES" help="Policy name"/>
+        </SWITCH>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall-policy "$KLISH_PARAM_name" |pager
+        </ACTION>
+      </COMMAND>
+      <COMMAND name="service" help="Show firewall services">
+        <SWITCH name="optional" min="0">
+          <PARAM name="name" ptype="/FIREWALL_SERVICES" help="Service name"/>
+        </SWITCH>
+        <ACTION sym="script" in="tty" out="tty" interrupt="true">
+          copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall-service "$KLISH_PARAM_name" |pager
+        </ACTION>
+      </COMMAND>
+    </SWITCH>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">
+      copy operational -x /infix-firewall:firewall | /usr/libexec/statd/cli-pretty show-firewall |pager
+    </ACTION>
+  </COMMAND>
+</COMMAND>
 
   <COMMAND name="factory-reset" help="Restore the system to factory default state">
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
@@ -500,12 +801,31 @@
     <ACTION sym="srp_rpc@sysrepo">/ietf-factory-default:factory-reset</ACTION>
   </COMMAND>
 
+  <COMMAND name="firewall" help="Control the firewall" mode="switch">
+    <COMMAND name="lockdown" help="Emergency lockdown mode">
+      <PARAM name="operation" ptype="/STRING" help="Lockdown commands.">
+        <COMPL>
+          <ACTION sym="printl">now</ACTION>
+          <ACTION sym="printl">cancel</ACTION>
+        </COMPL>
+      </PARAM>
+      <ACTION sym="script" in="tty" out="tty" interrupt="true">
+	if [ "${KLISH_PARAM_operation}" = "now" ]; then
+	  if ! firewall panic status; then
+            /bin/yorn -q "WARNING: This will block ALL network traffic and sever existing connections"
+	  fi
+	fi
+      </ACTION>
+      <ACTION sym="srp_rpc@sysrepo">/infix-firewall:firewall/lockdown-mode</ACTION>
+    </COMMAND>
+  </COMMAND>
+
   <COMMAND name="follow" help="Monitor a log file, use Ctrl-C to abort">
     <PARAM name="fn" ptype="/LOGFILES" help="Optional log file to monitor, default: syslog"/>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
       file=${KLISH_PARAM_fn:-syslog}
       echo -e "\e[1mPress Ctrl-C to abort ────────────────────────────────────────────\e[0m"
-      tail -F /log/$file
+      tail -F -n +1 /log/$file
     </ACTION>
   </COMMAND>
 
@@ -554,6 +874,19 @@
     </ACTION>
   </COMMAND>
 
+  <COMMAND name="terminal" help="Control the terminal (tty)" mode="switch">
+    <COMMAND name="reset" help="Reset terminal settings in case they are garbled">
+      <ACTION sym="script" in="tty" out="tty" interrupt="true">
+	reset
+      </ACTION>
+    </COMMAND>
+    <COMMAND name="resize" help="Force detect size change after terminal resize">
+      <ACTION sym="script" in="tty" out="tty" interrupt="true">
+	resize >/dev/null
+      </ACTION>
+    </COMMAND>
+  </COMMAND>
+
   <COMMAND name="tcpdump" help="Capture network traffic">
     <PARAM name="iface" ptype="/IFACES" help="Interrface to run capture on"/>
     <SWITCH name="optional" min="0" max="7">
@@ -576,18 +909,44 @@
     </ACTION>
   </COMMAND>
 
+  <COMMAND name="ssh" help="Connect to a remote device over SSH">
+    <SWITCH name="optional" min="0" max="2">
+      <COMMAND name="user" help="Login with a different username">
+        <PARAM name="user" ptype="/STRING" help="Remote username"/>
+      </COMMAND>
+      <COMMAND name="port" help="Connect to a non-standard port">
+        <PARAM name="port" ptype="/UINT" help="TCP port number"/>
+      </COMMAND>
+    </SWITCH>
+    <PARAM name="host" ptype="/STRING" help="Hostname or IP address"/>
+    <ACTION sym="ssh_connect@infix" in="tty" out="tty" interrupt="true"/>
+  </COMMAND>
+
+  <COMMAND name="no" help="Remove a setting or entry" mode="switch">
+    <COMMAND name="ssh" help="SSH client settings" mode="switch">
+      <COMMAND name="known-hosts" help="Remove a host from the SSH known_hosts file">
+        <PARAM name="host" ptype="/SSH_KNOWN_HOSTS" help="Hostname or IP to remove"/>
+        <ACTION sym="ssh_remove_known_host@infix"/>
+      </COMMAND>
+    </COMMAND>
+  </COMMAND>
+
   <COMMAND name="upgrade" help="Install a software update bundle from remote or local file">
     <PARAM name="URI" ptype="/STRING" help="[(ftp|tftp|http|https|sftp)://(dns.name | ip.address)/path/to/]upgrade-bundle.pkg"/>
-    <SWITCH name="optional" min="0" max="1">
+    <SWITCH name="optional" min="0" max="2">
       <COMMAND name="force" help="Force upgrade, ignoring compatibility check."/>
+      <COMMAND name="reboot" help="Reboot system after successful upgrade."/>
     </SWITCH>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
       force=${KLISH_PARAM_force:+--ignore-compatible}
       rauc install $force $KLISH_PARAM_URI
+      if [ $? -eq 0 -a -n "$KLISH_PARAM_reboot" ]; then
+        echo "Upgrade successful, rebooting..."
+        sleep 2
+        reboot
+      fi
     </ACTION>
   </COMMAND>
-
-</COMMAND>
 </VIEW>
 
 <VIEW name="config">

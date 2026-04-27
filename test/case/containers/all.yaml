@@ -1,0 +1,31 @@
+---
+
+- name: Container Basic
+  case: basic/test.py
+
+- name: Container Enabled/Disabled
+  case: enabled/test.py
+
+- name: Container Environment Variables
+  case: environment/test.py
+
+- name: Container with Bridge Network
+  case: bridge/test.py
+
+- name: Container with Physical Interface
+  case: phys/test.py
+
+- name: Container with VETH Pair
+  case: veth/test.py
+
+- name: Container Volume Persistence
+  case: volume/test.py
+
+- name: Container Upgrade
+  case: upgrade/test.py
+
+- name: Basic Firewall Container
+  case: firewall_basic/test.py
+
+- name: Host Command Execution from Container
+  case: host_commands/test.py

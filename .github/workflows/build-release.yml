@@ -1,0 +1,97 @@
+# Needed for make pkg-stats
+# sudo apt install python3-aiohttp
+---
+name: Build Release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
+      use_cache:
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  build:
+    name: Build Infix ${{ inputs.version }} [${{ matrix.target }}]
+    runs-on: [self-hosted, release]
+    strategy:
+      matrix:
+        target: [aarch64, arm, x86_64]
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          clean: true
+          submodules: recursive
+
+      - uses: kernelkit/actions/podman-cleanup@v1
+
+      - name: Set Release Variables
+        id: vars
+        run: |
+          ver=${{ inputs.version }}
+          echo "ver=${ver}" >> $GITHUB_OUTPUT
+          fver=${ver#v}
+          target=${{ matrix.target }}-${fver}
+          echo "dir=infix-$target"        >> $GITHUB_OUTPUT
+          echo "tgz=infix-$target.tar.gz" >> $GITHUB_OUTPUT
+
+      - uses: kernelkit/actions/cache-restore@v1
+        with:
+          target: ${{ matrix.target }}
+          enabled: ${{ inputs.use_cache }}
+
+      - name: Configure & Build
+        env:
+          INFIX_RELEASE: ${{ steps.vars.outputs.ver }}
+        run: |
+          target=${{ matrix.target }}_defconfig
+          echo "Building $target ..."
+          make $target
+          make
+
+      - name: Generate SBOM from Build
+        run: |
+          # Generate manifest files in CSV format for CycloneDX
+          make legal-info
+          # Generate cpe.json for CycloneDX
+          make -s show-info > output/cpe.json
+          # Generate pkg-stats.{json,html} for humans
+          make pkg-stats
+
+      - name: Build test specification
+        run: |
+          make test-spec
+
+      - name: Prepare Artifacts
+        run: |
+          cd output/
+
+          # Collect relevant files for SBOM and CPE info. for more info, see:
+          # https://github.com/CycloneDX/cyclonedx-buildroot
+          mkdir               images/sbom
+          mv pkg-stats.*      images/sbom/
+          mv cpe.json         images/sbom/
+          mv legal-info/*.csv images/sbom/
+
+          # Remove rootfs.squashfs from release (can be extracted from rootfs.itb)
+          # Saves ~131MB per architecture. See issue #858
+          rm -f images/rootfs.squashfs
+
+          mv images ${{ steps.vars.outputs.dir }}
+          ln -s ${{ steps.vars.outputs.dir }} images
+          tar cfz ${{ steps.vars.outputs.tgz }} ${{ steps.vars.outputs.dir }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: artifact-${{ matrix.target }}
+          path: output/*.tar.gz
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: artifact-disk-image-${{ matrix.target }}
+          path: output/images/*.qcow2

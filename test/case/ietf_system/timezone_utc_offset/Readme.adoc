@@ -1,1 +1,0 @@
-timezone_utc_offset.adoc

@@ -1,5 +1,4 @@
-Configure Context
------------------
+# CLI Configure Context
 
 Enter the configure context from admin-exec by typing `configure`
 followed by Enter.  Available commands, press `?` at the prompt:
@@ -41,14 +40,15 @@ admin@host:/config/interface/eth0/> up
 admin@host:/config/>
 ```
 
-> **Note:** the tree structure in the configure context is automatically
-> generated from the system's supported NETCONF YANG models, which may
-> vary between products.  However, the `ietf-interfaces.yang` and
-> `ietf-ip.yang` models, for instance, that provide basic networking
+> **Note**
+>
+> Commands in configure context are automatically generated from the
+> system's YANG models, hence different products likely have a different
+> set of commands.  However, both the `ietf-interfaces.yang` and
+> `ietf-ip.yang` models, for instance, that provide the networking
 > support are common to all systems.
 
-
-### Set IP Address on an Interface
+## Set IP Address on an Interface
 
 ```
 admin@host:/config/> edit interface eth0
@@ -72,8 +72,7 @@ interfaces {
 }
 ```
 
-
-### Saving Changes
+## Saving Changes
 
 Apply the changes (from candidate to `running-config`):
 
@@ -83,12 +82,12 @@ admin@host:/> show running-config
 ...
 interfaces {
   interface eth0 {
-	type ethernetCsmacd;
-	ipv4 {
-	  address 192.168.2.200 {
-		prefix-length 24;
-	  }
-	}
+    type ethernetCsmacd;
+    ipv4 {
+      address 192.168.2.200 {
+        prefix-length 24;
+      }
+    }
   }
 ...
 ```
@@ -104,11 +103,12 @@ admin@host:/> copy running-config startup-config
 The `startup-config` can also be inspected with the `show` command to
 verify the changes are saved.
 
-> **Note:** most (all) commands need to be spelled out, no short forms
-> are allowed at the moment.  Use the `TAB` key to make this easier.
+> **Important**
+>
+> All commands need to be spelled out, no short forms are allowed in the
+> CLI.  Use the `TAB` key to make your life easier.
 
-
-### Changing Hostname
+## Changing Hostname
 
 Settings like hostname are located in the `ietf-system.yang` model.
 Here is how it can be set.
@@ -123,25 +123,26 @@ admin@example:/>
 Notice how the hostname in the prompt does not change until the change
 is committed.
 
-> **Note:** critical services like syslog, mDNS, LLDP, and similar that
-> advertise the hostname, are restarted when the hostname is changed.
+> **Note**
+>
+> Critical services like syslog, mDNS, LLDP, and similar that advertise
+> the hostname, are restarted when the hostname is changed.
 
-
-### Changing Password
+## Changing Password
 
 User management, including passwords, is also a part of `ietf-system`.
 
 ```
 admin@host:/config/> edit system authentication user admin
 admin@host:/config/system/authentication/user/admin/> change password
-New password: 
-Retype password: 
+New password:
+Retype password:
 admin@host:/config/system/authentication/user/admin/> leave
 ```
 
 The `change password` command starts an interactive dialogue that asks
 for the new password, with a confirmation, and then salts and encrypts
-the password with sha512crypt. 
+the password with sha512crypt.
 
 It is also possible to use the `set password ...` command.  This allows
 setting an already hashed password.  To manually hash a password, use
@@ -149,12 +150,13 @@ the `do password encrypt` command.  This launches the admin-exec command
 to hash, and optionally salt, your password.  This encrypted string can
 then be used with `set password ...`.
 
-> **Tip:** if you are having trouble thinking of a password, there is
-> also `do password generate`, which generates random but readable
-> strings using the UNIX command `pwgen`.
+> **Tip**
+>
+> If you are having trouble thinking of a password, there is also `do
+> password generate`, which generates random but readable strings using
+> the UNIX command `pwgen`.
 
-
-### SSH Authorized Key
+## SSH Authorized Key
 
 Logging in remotely with SSH is possible by adding a *public key* to a
 user.  Here we add the authorized key to the admin user, multiple keys
@@ -174,11 +176,15 @@ key-data AAAAB3NzaC1yc2EAAAADAQABAAABgQC8iBL42yeMBioFay7lty1C4ZDTHcHyo739gc91rTT
 admin@host:/config/system/authentication/user/admin/authorized-key/example@host/> leave
 ```
 
-> **Note:** the `ssh-keygen` program already base64 encodes the public
-> key data, so there is no need to use the `text-editor` command, `set`
-> does the job.
+> **Note**
+>
+> The `ssh-keygen` program already base64 encodes the public key data,
+> so there is no need to use the `text-editor` command, `set` does the
+> job.
 
-### Creating a VETH Pair
+----
+
+## Creating a VETH Pair
 
 The following example creates a `veth0a <--> veth0b` virtual Ethernet
 pair which is useful for connecting, e.g., a container to the physical
@@ -214,12 +220,14 @@ admin@host:/config/> leave
 
 See the bridging example below for more.
 
-> **Note:** in the CLI you do not have to create the `veth0b` interface.
-> The system _infers_ this for you.  When setting up a VETH pair using
-> NETCONF, however, you must include the `veth0b` interface.
+> **Tip**
+>
+> In the CLI you do not have to create the `veth0b` interface.  The
+> system _infers_ this for you.  This does not apply when setting up a
+> VETH pair using NETCONF or RESTCONF, then you must submit a complete
+> configuration.
 
-
-### Creating a Bridge
+## Creating a Bridge
 
 Building on the previous example, we now create a non-VLAN filtering
 bridge (`br0`) that forwards any, normally link-local, LLDP traffic
@@ -273,6 +281,8 @@ the VETH pair from the previous example) are now bridged.  Any traffic
 ingressing one port will egress the other.  Only reserved IEEE multicast
 is filtered, except LLDP frames as shown above.
 
-> **Note:** the bridge can be named anything, provided the interface
-> name is not already taken.  However, for any name outside the pattern
-> `br[0-9]+`, you have to set the interface type manually to `bridge`.
+> **Important**
+>
+> The bridge can be named anything, provided the interface name is not
+> already taken.  However, for any name outside the pattern `br[0-9]+`,
+> you have to set the interface type manually to `bridge`.

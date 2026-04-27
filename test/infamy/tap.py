@@ -1,3 +1,32 @@
+"""TAP (Test Anything Protocol) output helpers for Infamy tests.
+
+TAP is a simple line-based protocol for communicating test results between a
+test producer and a consumer (harness).  The canonical reference is:
+
+  https://testanything.org/tap-specification.html
+
+The key elements are:
+
+  Plan line:    ``1..N``           — total number of tests, written once
+  Result lines: ``ok N - desc``    — test N passed
+                ``not ok N - desc``— test N failed
+  Directives:   ``ok N # SKIP``    ``not ok N # TODO``
+  Diagnostics:  Any line beginning with ``#`` is a comment/diagnostic.
+
+The plan line may appear either at the beginning (before any results) or at
+the end (after all results).  Infamy writes it at the END so that the total
+step count is known; a harness that requires an upfront plan will report
+"no plan" on failure — see CommentWriter below for a known limitation.
+
+``CommentWriter`` redirects Python's ``sys.stdout`` so that ordinary
+``print()`` calls are prefixed with ``# `` and appear as diagnostics, while
+TAP result lines (written via ``self.out``, the *original* stdout) are emitted
+verbatim.  The plan line is also written via ``self.out``.
+
+Note: because ``sys.stdout`` is replaced *after* module import the default
+argument ``output=sys.stdout`` captures the original stream at import time,
+so nested or re-entrant ``Test()`` instances will share the same ``self.out``.
+"""
 import contextlib
 import datetime
 import subprocess
@@ -30,7 +59,7 @@ class Test:
         self.out.flush()
         return self
 
-    def __exit__(self, _, e, __):
+    def __exit__(self, t, e, tb):
         now = datetime.datetime.now().strftime("%F %T")
         self.out.write(f"# Exiting ({now})\n")
         self.out.flush()
@@ -40,18 +69,24 @@ class Test:
         if not e:
             self._not_ok("Missing explicit test result\n")
         else:
-            if type(e) in (TestPass, TestSkip):
-                self.out.write(f"{self.steps}..{self.steps}\n")
+            if t in (TestPass, TestSkip):
+                self.out.write(f"1..{self.steps}\n")
                 self.out.flush()
                 raise SystemExit(0)
-
-            traceback.print_exception(e, file=self.commenter)
+            if t is AssertionError:
+                traceback.print_tb(tb, file=self.commenter)
+                self.out.write(f"{str(e)}\n")
+                self.out.flush()
+            else:
+                traceback.print_exception(e, file=self.commenter)
 
             if type(e) is subprocess.CalledProcessError:
                 print("Failing subprocess stdout:\n", e.stdout)
             elif len(e.args) and type(e.args[0]) is subprocess.CompletedProcess:
                 print("Failing subprocess stdout:\n", e.args[0].stdout)
 
+        self.out.write(f"1..{self.steps}\n")
+        self.out.flush()
         raise SystemExit(1)
 
     @contextlib.contextmanager
@@ -95,7 +130,10 @@ class Test:
     def skip(self):
         raise TestSkip()
 
-    def fail(self):
+    def fail(self, message=None):
+        if message:
+            self.out.write(f"# {message}\n")
+            self.out.flush()
         raise TestFail()
 
 

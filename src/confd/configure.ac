@@ -1,6 +1,6 @@
 AC_PREREQ(2.61)
 # confd version is same as system YANG model version, step on breaking changes
-AC_INIT([confd], [1.5], [https://github.com/kernelkit/infix/issues])
+AC_INIT([confd], [1.8], [https://github.com/kernelkit/infix/issues])
 AM_INIT_AUTOMAKE(1.11 foreign subdir-objects)
 AM_SILENT_RULES(yes)
 
@@ -19,10 +19,12 @@ AC_CONFIG_FILES([
 	share/migrate/1.3/Makefile
 	share/migrate/1.4/Makefile
 	share/migrate/1.5/Makefile
+	share/migrate/1.6/Makefile
+	share/migrate/1.7/Makefile
+	share/migrate/1.8/Makefile
 	yang/Makefile
 	yang/confd/Makefile
 	yang/test-mode/Makefile
-	yang/rousette/Makefile
 	src/Makefile
 ])
 
@@ -41,6 +43,14 @@ AC_ARG_ENABLE(containers,
         AS_HELP_STRING([--enable-containers], [Enable support for containers]),,[
 	enable_containers=no])
 
+AC_ARG_ENABLE(wifi,
+        AS_HELP_STRING([--enable-wifi], [Enable support for Wi-Fi]),,[
+	enable_wifi=no])
+
+AC_ARG_ENABLE(gps,
+        AS_HELP_STRING([--enable-gps], [Enable support for GPS receivers]),,[
+	enable_gps=no])
+
 AC_ARG_WITH(login-shell,
         AS_HELP_STRING([--with-login-shell=shell], [Login shell for new users, default: /bin/false]),
 	[login_shell=$withval], [login_shell=yes])
@@ -51,6 +61,12 @@ AC_ARG_WITH(crypt,
 
 AS_IF([test "x$enable_containers" = "xyes"], [
         AC_DEFINE(CONTAINERS, 1, [Built with container support])])
+
+AS_IF([test "x$enable_wifi" = "xyes"], [
+        AC_DEFINE(HAVE_WIFI, 1, [Built with Wi-Fi support])])
+
+AS_IF([test "x$enable_gps" = "xyes"], [
+        AC_DEFINE(HAVE_GPS, 1, [Built with GPS receiver support])])
 
 AS_IF([test "x$with_login_shell" != "xno"], [
 	AS_IF([test "x$login_shell" = "xyes"], [login_shell=/bin/false])
@@ -69,8 +85,18 @@ PKG_CHECK_MODULES([crypt],   [libxcrypt >= 4.4.27])
 PKG_CHECK_MODULES([glib],    [glib-2.0 >= 2.50 gio-2.0 gio-unix-2.0])
 PKG_CHECK_MODULES([jansson], [jansson >= 2.0.0])
 PKG_CHECK_MODULES([libite],  [libite >= 2.6.1])
-PKG_CHECK_MODULES([sysrepo], [sysrepo >= 2.2.36])
+PKG_CHECK_MODULES([sysrepo], [sysrepo >= 4.2.10])
+PKG_CHECK_MODULES([libyang], [libyang >= 4.2.2])
 PKG_CHECK_MODULES([libsrx],  [libsrx >= 1.0.0])
+
+AC_CHECK_HEADER([ev.h],
+    [saved_LIBS="$LIBS"
+     AC_CHECK_LIB([ev], [ev_loop_new],
+        [EV_LIBS="-lev"],
+        [AC_MSG_ERROR("libev not found")])
+     LIBS="$saved_LIBS"],
+    [AC_MSG_ERROR("ev.h not found")])
+AC_SUBST([EV_LIBS])
 
 # Control build with automake flags
 AM_CONDITIONAL(CONTAINERS,   [test "x$enable_containers" != "xno"])
@@ -122,6 +148,8 @@ cat <<EOF
 
 Optional features:
   Container support ....: $enable_containers
+  Wi-Fi support ........: $enable_wifi
+  GPS support ..........: $enable_gps
   Login shell ..........: $login_shell
   Default crypt algo ...: $crypt
 

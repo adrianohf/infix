@@ -1,0 +1,48 @@
+---
+- name: Static Routing
+  case: static_routing/test.py
+
+- name: OSPF Basic
+  case: ospf_basic/test.py
+
+- name: OSPF Unnumbered Interfaces
+  case: ospf_unnumbered_interface/test.py
+
+- name: OSPF with Multiple Areas
+  case: ospf_multiarea/test.py
+
+- name: OSPF BFD
+  case: ospf_bfd/test.py
+
+- name: "Route preference: OSPF vs Static"
+  case: route_pref_ospf/test.py
+
+- name: "Route preference: DHCP vs Static"
+  case: route_pref_dhcp/test.py
+
+- name: "Route preference: Static Route Activation and Maximum Distance"
+  case: route_pref_255/test.py
+
+- name: OSPF Default Route Advertise
+  case: ospf_default_route_advertise/test.py
+
+- name: OSPF Debug Logging
+  case: ospf_debug/test.py
+
+- name: OSPF Point-to-Multipoint Hybrid
+  case: ospf_point_to_multipoint_hybrid/test.py
+
+- name: OSPF Point-to-Multipoint
+  case: ospf_point_to_multipoint/test.py
+
+- name: RIP Basic
+  case: rip_basic/test.py
+
+- name: RIP Passive Interface
+  case: rip_passive_interface/test.py
+
+- name: RIP Redistribution
+  case: rip_redistribute/test.py
+
+- name: RIP Multi-hop
+  case: rip_multihop/test.py

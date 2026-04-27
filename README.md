@@ -1,66 +1,78 @@
-[![License Badge][]][License] [![GitHub Status][]][GitHub] [![Coverity Status][]][Coverity Scan] [![Discord][discord-badge]][discord-url]
+[![License Badge][]][License] [![Release Badge][]][Release] [![GitHub Status][]][GitHub] [![Coverity Status][]][Coverity Scan] [![Discord][discord-badge]][discord-url]
 
-<img align="right" src="doc/logo.png" alt="Infix - Linux <3 NETCONF" width=480 border=10>
+<img align="right" src="doc/logo.png" alt="Infix — Immutable.Friendly.Secure" width=480 padding=10>
 
-Infix is a free, Linux based, immutable Network Operating System (NOS)
-built on [Buildroot][1], and [sysrepo][2].  A powerful mix that ease
-porting to different platforms, simplify long-term maintenance, and
-provide made-easy management using NETCONF, RESTCONF[^2], or the
-built-in command line interface (CLI) from a console or SSH login.
+Turn any ARM or x86 device into a powerful, manageable network appliance
+in minutes. From $35 Raspberry Pi boards to enterprise switches — deploy
+routers, IoT gateways, edge devices, or custom network solutions that
+just work.
 
-> Click the **▶ Example CLI Session** foldout below for an example, or
-> head on over to the [Infix Documentation](doc/README.md) for more
-> information on how to set up the system.
+## Our Values
 
-Although primarily focused on switches and routers, the core values
-may be appealing for other use-cases as well:
+**🔒 Immutable**  
+Your system never breaks.  Read-only filesystem with atomic upgrades
+means no configuration drift, no corrupted updates, and instant rollback
+if something goes wrong.  Deploy once, trust forever.
 
-- Runs from a squashfs image on a read-only partition
-- Single configuration file on a separate partition
-- Built around YANG with standard IETF models
-- Linux switchdev provides open switch APIs
-- Atomic upgrades to secondary partition
-- Highly security focused
+**🤝 Friendly**  
+Actually easy to use. Auto-generated CLI from standard YANG models comes
+with built-in help for every command — just hit <kbd>?</kbd> or
+<kbd>TAB</kbd> for context-aware assistance.
 
-An immutable[^1] operating system enhances security and inherently makes
-it maintenance-free.  Configuration and data, e.g, containers, is stored
-on separate partitions to ensure complete separation from system files
-and allow for seamless backup, restore, and provisioning.
+Familiar NETCONF & RESTCONF APIs and [comprehensive documentation][4]
+mean you're never stuck.  Whether you're learning networking or managing
+enterprise infrastructure.
 
-In itself, Infix is perfectly suited for dedicated networking tasks, and
-with native support for Docker containers, the operating system provides
-a versatile platform that can easily be adapted to any customer need.
-Be it legacy applications, network protocols, process monitoring, or
-edge data analysis, it can run close to end equipment.  Either directly
-connected on dedicated Ethernet ports or indirectly using virtual
-network cables to exist on the same LAN as other connected equipment.
+**🛡️ Secure**  
+Built with security as a foundation, not an afterthought.  Minimal
+attack surface, separation between system and data, and container
+isolation.  Sleep better knowing your infrastructure is protected.
 
-The simple design of Infix provides complete control over both system
-and data, minimal cognitive burden, and makes it incredibly easy to get
-started.
+## Why Choose Infix
 
-<details><summary><b>Example CLI Session</b></summary>
+**Hardware Flexibility**: Start with a $35 Raspberry Pi, scale to
+enterprise switching hardware.  Same OS, same tools, same reliability.
 
-The CLI configure context is automatically generated from the loaded
-YANG models and their corresponding [sysrepo][2] plugins.  The following
-is brief example of how to set the IP address of an interface:
+**Standards-Based**: Built around YANG models and IETF standards. Learn
+once, use everywhere - no vendor lock-in.
 
-```
-admin@infix-12-34-56:/> configure
-admin@infix-12-34-56:/config/> edit interface eth0
-admin@infix-12-34-56:/config/interface/eth0/> set ipv4 <TAB>
-      address     autoconf bind-ni-name      enabled
-	  forwarding  mtu      neighbor
-admin@infix-12-34-56:/config/interface/eth0/> set ipv4 address 192.168.2.200 prefix-length 24
-admin@infix-12-34-56:/config/interface/eth0/> show
+**Container Ready**: Run your applications alongside networking
+functions.  GPIO access, dedicated Ethernet ports, custom protocols —
+your device, your rules.
+
+## Use Cases
+
+1. **Home Labs & Hobbyists**:  
+   Transform a Raspberry Pi into a full-featured router with WiFi  
+1. **IoT & Edge Computing**:  
+   Bridge devices to the cloud with reliable, updatable gateways  
+1. **Small Business Networks**:  
+   Enterprise-grade features without the complexity or cost  
+1. **Developers & Makers**:  
+   Test networking concepts, prototype IoT solutions, or build custom
+   appliances
+1. **Network Professionals**:  
+   Consistent tooling from development to production deployment.  
+   How about a digital twin using raw Qemu or [GNS3](https://gns3.com/infix)!
+
+## Quick Example
+
+Configure an interface in seconds - the CLI guides you with built-in help:
+
+<pre><code>admin@infix-12-34-56:/> <b>configure</b>
+admin@infix-12-34-56:/config/> <b>edit interface eth0</b>
+admin@infix-12-34-56:/config/interface/eth0/> <b>set ipv4</b> <kbd>TAB</kbd>
+      address     autoconf      bind-ni-name     dhcp 
+      enabled     forwarding    mtu              neighbor
+admin@infix-12-34-56:/config/interface/eth0/> <b>set ipv4 address 192.168.2.200 prefix-length 24</b>
+admin@infix-12-34-56:/config/interface/eth0/> <b>show</b>
 type ethernet;
 ipv4 {
   address 192.168.2.200 {
     prefix-length 24;
   }
 }
-ipv6
-admin@infix-12-34-56:/config/interface/eth0/> diff
+admin@infix-12-34-56:/config/interface/eth0/> <b>diff</b>
 interfaces {
   interface eth0 {
 +    ipv4 {
@@ -70,69 +82,100 @@ interfaces {
 +    }
   }
 }
-admin@infix-12-34-56:/config/interface/eth0/> leave
-admin@infix-12-34-56:/> show interfaces
-INTERFACE       PROTOCOL   STATE       DATA
-eth0            ethernet   UP          52:54:00:12:34:56
-                ipv4                   192.168.2.200/24 (static)
-                ipv6                   fe80::5054:ff:fe12:3456/64 (link-layer)
+admin@infix-12-34-56:/config/interface/eth0/> <b>leave</b>
+admin@infix-12-34-56:/> <b>show interfaces</b>
+<u>INTERFACE       PROTOCOL   STATE       DATA                                  </u>
 lo              ethernet   UP          00:00:00:00:00:00
                 ipv4                   127.0.0.1/8 (static)
                 ipv6                   ::1/128 (static)
-admin@infix-12-34-56:/> copy running-config startup-config
-```
+eth0            ethernet   UP          52:54:00:12:34:56
+                ipv4                   192.168.2.200/24 (static)
+                ipv6                   fe80::5054:ff:fe12:3456/64 (link-layer)
+admin@infix-12-34-56:/> <b>copy running startup</b>
+</code></pre>
 
-[Click here][3] for more details.
-</details>
+Notice how <kbd>TAB</kbd> completion shows available options, `show`
+displays current config, and `diff` shows exactly what changed before
+you commit your changes with the `leave` command.
 
-Infix can run on many different types of architectures and boards, much
-thanks to Linux and Buildroot.  Currently the focus is on 64-bit ARM
-devices, optionally with switching fabric supported by Linux switchdev.
-The [following boards](board/aarch64/README.md) are fully supported:
+For more information, see [CLI documentation][3].
 
- - Marvell CN9130 CRB
- - Marvell EspressoBIN
- - Microchip SparX-5i PCB135 (eMMC)
- - Raspberry Pi 4B
- - NanoPi R2S
+## Get Started
 
-Additionally, StarFive VisionFive2, a RISC-V based two-port router, and
-an x86_64 build is also available.  The latter is primarily intended for
-development and testing, but can also be used for evaluation and demo
-purposes.  For more information, see: [Infix in Virtual
-Environments](doc/virtual.md).
+Get [pre-built images][5] for your hardware.  Use the CLI, web
+interface, or standard NETCONF/RESTCONF tools, e.g., `curl`.  Add
+containers for any custom functionality you need.
 
-> See the [GitHub Releases](https://github.com/kernelkit/infix/releases)
-> page for our pre-built images.  The *[Latest Build][]* has bleeding
-> edge images, if possible we recommend using a versioned release.
->
-> For *customer specific builds* of Infix, see your product repository.
+### Supported Platforms
 
+- **Raspberry Pi 2B/3B/4B/CM4** - Perfect for home labs, learning, and prototyping
+- **Banana Pi-R3** - Your next home router and gateway
+- **NanoPi R2S** - Compact dual-port router in a tiny package
+- **x86_64** - Run in VMs or on mini PCs for development and testing
+- **Marvell CN9130 CRB, EspressoBIN** - High-performance ARM64 platforms
+- **Microchip SparX-5i** - Enterprise switching capabilities
+- **Microchip SAMA7G54-EK** - ARM Cortex-A7
+- **NXP i.MX8MP EVK** - Highly capable ARM64 SoC
+- **StarFive VisionFive2** - RISC-V architecture support
 
-----
+*Why start with Raspberry Pi?* It's affordable, widely available, has
+built-in WiFi + Ethernet, and runs the exact same Infix OS you'd deploy
+in production. Perfect for learning, prototyping, or even small-scale
+deployments.
+
+> 📖 **[Complete documentation][4]** • 💬 **[Join our Discord][discord-url]**
+
+## Technical Details
+
+<a href="https://bitsign.se">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://bitsign.se/assets/badges/bitsign-badge-dark-mode.png">
+    <source media="(prefers-color-scheme: light)" srcset="https://bitsign.se/assets/badges/bitsign-badge-light-mode.png">
+    <img alt="bitSign - Code Signing" src="https://bitsign.se/assets/badges/bitsign-badge-light-mode.png" align="right" width=150 padding=10>
+  </picture>
+</a>
+
+Built on proven open-source foundations: [Linux][0], [Buildroot][1], and
+[sysrepo][2] — for reliability you can trust:
+
+- **Immutable OS**: Read-only filesystem, atomic updates, instant rollback
+- **YANG Configuration**: Industry-standard models with auto-generated tooling
+- **Hardware Acceleration**: Linux switchdev support for wire-speed packet processing
+- **Container Integration**: Docker support with flexible network and hardware access
+- **Memory Efficient**: Runs comfortably on devices with as little as 256 MB RAM
+- **Code Signing**: Releases are cryptographically signed for integrity verification
+
+Perfect for everything from resource-constrained edge devices to
+high-throughput network appliances.
+
+With the entire system modeled in YANG, scalability is no longer an
+issue, be it in development, testing, or end users deploying and
+monitoring their devices.  All knobs and dials are accessible from the
+CLI (console/SSH), or remotely using the native NETCONF or RESTCONF
+APIs.
+
+> Check the *[Latest Build][]* for bleeding-edge features.
+
+---
 
 <div align="center">
-  <a href="https://github.com/wires-se"><img src="https://raw.githubusercontent.com/wires-se/.github/main/profile/logo.png" width=300></a>
-  <br />Infix development is sponsored by <a href="https://wires.se">Wires<a>
+  <a href="https://github.com/wires-se"><img src="https://raw.githubusercontent.com/wires-se/.github/main/profile/play.svg" width=300></a>
+  <br />Infix development is sponsored by <a href="https://wires.se">Wires</a>
 </div>
 
-----
+![Alt](https://repobeats.axiom.co/api/embed/5ce7a2a67edc923823afa0f60c327a6e8575b6e9.svg "Repobeats analytics image")
 
-[^1]: An immutable operating system is one with read-only file systems,
-    atomic updates, rollbacks, declarative configuration, and workload
-    isolation.  All to improve reliability, scalability, and security.
-    For more information, see <https://ceur-ws.org/Vol-3386/paper9.pdf>
-    and <https://www.zdnet.com/article/what-is-immutable-linux-heres-why-youd-run-an-immutable-linux-distro/>.
-
-[^2]: Partial RESTCONF support, features like HTTP PATCH, OPTIONS, HEAD,
-    and copying between datastores are still missing.
-
-[1]: https://buildroot.org/
-[2]: https://www.sysrepo.org/
-[3]: doc/cli/introduction.md
-[Latest Build]:    https://github.com/kernelkit/infix/releases/tag/latest
+[0]: https://www.kernel.org
+[1]: https://buildroot.org/ "Buildroot Homepage"
+[2]: https://www.sysrepo.org/ "Sysrepo Homepage"
+[3]: https://www.kernelkit.org/infix/latest/cli/introduction/
+[4]: https://www.kernelkit.org/infix/
+[5]: https://github.com/kernelkit/infix/releases/latest
+[Latest Build]:    https://github.com/kernelkit/infix/releases/tag/latest "Latest build"
 [License]:         https://en.wikipedia.org/wiki/GPL_license
 [License Badge]:   https://img.shields.io/badge/License-GPL%20v2-blue.svg
+[Release]:         https://github.com/kernelkit/infix/releases/latest
+[Release Badge]:   https://img.shields.io/github/v/release/kernelkit/infix 
 [GitHub]:          https://github.com/kernelkit/infix/actions/workflows/build.yml/
 [GitHub Status]:   https://github.com/kernelkit/infix/actions/workflows/build.yml/badge.svg
 [Coverity Scan]:   https://scan.coverity.com/projects/29393

@@ -1,0 +1,137 @@
+name: Test Infix
+
+on:
+  workflow_dispatch:
+    inputs:
+      infix_repo:
+        description: 'Repo to checkout (for spin overrides)'
+        required: false
+        default: kernelkit/infix
+        type: string
+      infix_branch:
+        description: 'Branch/tag/commit to checkout (for spin overrides)'
+        default: ''
+        type: string
+
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      name:
+        required: true
+        type: string
+      infix_repo:
+        required: false
+        type: string
+        default: kernelkit/infix
+      infix_branch:
+        required: false
+        type: string
+        default: ''
+        description: 'Branch/tag/commit to checkout (for spin overrides). Defaults to github.ref if not specified'
+      ninepm-conf:
+        required: false
+        type: string
+        default: ''
+      test-path:
+        required: false
+        type: string
+        default: 'test'
+      pre_test_script:
+        required: false
+        type: string
+        default: ''
+        description: 'Optional script to run after checkout (for spin customization)'
+    secrets:
+      CHECKOUT_TOKEN:
+        required: false
+        description: 'Token for cross-repository access'
+
+env:
+  TARGET: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || inputs.target }}
+  INFIX_REPO: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.infix_repo || inputs.infix_repo }}
+  INFIX_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.infix_branch || inputs.infix_branch }}
+  NINEPM_CONF: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ninepm-conf || inputs.ninepm-conf }}
+  TEST_PATH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.test-path || inputs.test-path }}
+
+jobs:
+  test:
+    name: Regression Test ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.name || inputs.name }} ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || inputs.target }}
+    runs-on: [self-hosted, regression]
+    steps:
+      - name: Checkout infix repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.INFIX_REPO }}
+          ref: ${{ env.INFIX_BRANCH != '' && env.INFIX_BRANCH || github.ref }}
+          clean: true
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+
+      - uses: kernelkit/actions/podman-cleanup@v1
+
+      - name: Run pre-test script
+        if: ${{ inputs.pre_test_script != '' }}
+        run: |
+          cat > ./pre-test.sh << 'EOF'
+          ${{ inputs.pre_test_script }}
+          EOF
+          chmod +x ./pre-test.sh
+          bash ./pre-test.sh
+
+      - name: Set Build Variables
+        id: vars
+        run: |
+          if [ -n "${{ needs.build.outputs.build_id }}" ]; then
+              echo "INFIX_BUILD_ID=${{ needs.build.outputs.build_id }}" \
+                   >>$GITHUB_ENV
+          fi
+
+      - name: Configure ${{ env.TARGET }}
+        run: |
+          make ${{ env.TARGET }}_defconfig
+
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: "artifact-*"
+          merge-multiple: true
+
+      - name: Restore ${{ env.TARGET }} output/
+        run: |
+          target=${{ env.TARGET }}
+          name=${{ inputs.name }}
+
+          ls -l
+          mkdir -p output
+          mv ${name}-${target}.tar.gz output/
+          cd output/
+          tar xf ${name}-${target}.tar.gz
+          ln -s ${name}-${target} images
+
+      - name: Regression Test ${{ env.TARGET }}
+        run: |
+          if [ -n "$NINEPM_CONF" ]; then
+            export NINEPM_PROJ_CONFIG="${GITHUB_WORKSPACE}/$NINEPM_CONF"
+            echo "DEBUG: NINEPM_PROJ_CONFIG is '$NINEPM_PROJ_CONFIG'"
+          fi
+          make test
+
+      - name: Publish Test Result for ${{ env.TARGET }}
+        # Ensure this runs even if Regression Test fails
+        if: always()
+        run: |
+          cat $TEST_PATH/.log/last/result-gh.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate Test Report for ${{ env.TARGET }}
+        # Ensure this runs even if Regression Test fails
+        if: always()
+        run: |
+          make test-dir="$(pwd)/$TEST_PATH" test-report
+
+      - name: Upload Test Report as Artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-report
+          path: output/images/test-report.pdf

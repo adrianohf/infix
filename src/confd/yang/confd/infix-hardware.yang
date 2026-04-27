@@ -13,10 +13,30 @@ module infix-hardware {
     prefix yang;
   }
 
+  import infix-wifi-country-codes {
+    prefix iwcc;
+  }
+
   organization "KernelKit";
   contact      "kernelkit@googlegroups.com";
   description  "Vital Product Data augmentation of ieee-hardware and deviations.";
 
+  revision 2026-02-08 {
+    description "Add GPS/GNSS receiver hardware class and container for time sync.";
+    reference "internal";
+  }
+  revision 2026-01-19 {
+    description "Add probe-timeout for slow USB WiFi dongles.";
+    reference "internal";
+  }
+  revision 2025-12-04 {
+    description "Add WiFi radio survey container for channel utilization data.";
+    reference "internal";
+  }
+  revision 2025-10-30 {
+    description "Add phys-address leaf for hardware components and enable sensor support.";
+    reference "internal";
+  }
   revision 2024-04-25 {
     description "Spellcheck leaf: coutry-code -> country-code";
     reference "internal";
@@ -24,6 +44,13 @@ module infix-hardware {
   revision 2024-01-18 {
     description "Initial";
     reference "internal";
+  }
+  feature wifi {
+    description "WiFi support is an optional build-time feature in Infix.";
+  }
+
+  feature gps {
+    description "GPS support is an optional build-time feature in Infix.";
   }
 
   typedef country-code {
@@ -34,25 +61,65 @@ module infix-hardware {
     description "A two-letter country code.";
   }
 
-  identity hardware-class {
-    description "infix hardware base class";
+  /*
+   * WiFi-specific typedefs
+   */
+
+  typedef wifi-radio-ref {
+    type leafref {
+      path "/iehw:hardware/iehw:component/iehw:name";
+    }
+    description
+      "Reference to a WiFi radio hardware component.
+       WiFi radios are hardware components with class 'ih:wifi'.";
   }
 
+  typedef gps-receiver-ref {
+    type leafref {
+      path "/iehw:hardware/iehw:component/iehw:name";
+    }
+    description
+      "Reference to a GPS/GNSS receiver hardware component.
+       GPS receivers are hardware components with class 'ih:gps'.";
+  }
+
+  typedef wifi-band {
+    type enumeration {
+      enum "2.4GHz" {
+        description "2.4 GHz band (channels 1-14, maximum compatibility)";
+      }
+      enum "5GHz" {
+        description "5 GHz band (less congestion, higher throughput, recommended)";
+      }
+      enum "6GHz" {
+        description "6 GHz band (WiFi 6E, requires compatible hardware)";
+      }
+    }
+    description "WiFi frequency band selection.";
+  }
+
+  /*
+   * Hardware class identities
+   */
+
   identity usb {
-    base hardware-class;
+    base iahw:hardware-class;
     description "This identity is used to describe a USB port";
   }
   identity vpd {
-    base hardware-class;
+    base iahw:hardware-class;
     description "This identity is used to a VPD memory on the device.";
   }
+  identity wifi {
+    if-feature wifi;
+    base iahw:hardware-class;
+    description "This identity is used to describe a WiFi radio/PHY";
+  }
 
-  deviation "/iehw:hardware/iehw:component/iehw:class" {
-    deviate replace {
-      type identityref {
-        base hardware-class;
-      }
-    }
+  identity gps {
+    if-feature gps;
+    base iahw:hardware-class;
+    description "GPS/GNSS receiver for time synchronization";
   }
 
   deviation "/iehw:hardware/iehw:component/iehw:state/iehw:admin-state" {
@@ -66,15 +133,6 @@ module infix-hardware {
   deviation "/iehw:hardware/iehw:component/iehw:state/iehw:standby-state" {
     deviate not-supported;
   }
-  deviation "/iehw:hardware/iehw:component/iehw:sensor-data" {
-    deviate not-supported;
-  }
-  deviation "/iehw:hardware/iehw:component/iehw:parent" {
-    deviate not-supported;
-  }
-  deviation "/iehw:hardware/iehw:component/iehw:parent-rel-pos" {
-    deviate not-supported;
-  }
   deviation "/iehw:hardware/iehw:component/iehw:alias" {
     deviate not-supported;
   }
@@ -85,6 +143,18 @@ module infix-hardware {
     deviate not-supported;
   }
   augment "/iehw:hardware/iehw:component" {
+    leaf phys-address {
+      type yang:phys-address;
+      config false;
+      description
+        "The physical address of the hardware component. For chassis components,
+         this represents the base MAC address used for the system. This is
+         typically sourced from VPD data on enterprise hardware, or derived from
+         the first physical interface on single-board computers (SBCs) without
+         VPD. May be used as the base for generating addresses for virtual
+         interfaces. For other component types, this could represent various
+         physical layer addresses (e.g., Fibre Channel WWN, InfiniBand GUID).";
+    }
     container vpd-data {
       config false;
       leaf product-name {
@@ -142,6 +212,452 @@ module infix-hardware {
 	leaf extension-data {
 	  type string;
 	}
+      }
+    }
+
+    /*
+     * WiFi Radio configuration (when class = 'ih:wifi')
+     */
+
+    container wifi-radio {
+      if-feature wifi;
+      when "derived-from-or-self(../iehw:class, 'ih:wifi')";
+      presence "WiFi radio configuration";
+      description
+        "WiFi radio/PHY configuration and operational data.
+
+         This container is present when the hardware component represents
+         a WiFi radio (class 'ih:wifi'). WiFi radios are physical devices
+         that can host multiple virtual WiFi interfaces (APs or Stations).";
+
+      leaf country-code {
+        type iwcc:country-code;
+        mandatory true;
+        description
+          "Two-letter ISO 3166-1 country code for regulatory compliance.
+
+           Sets the regulatory domain for this radio, determining:
+           - Allowed channels and frequencies
+           - Maximum transmit power
+           - DFS (Dynamic Frequency Selection) requirements
+
+           Examples: 'US', 'DE', 'JP'.
+
+           WARNING: Incorrect values may violate local laws and regulations.";
+      }
+
+      leaf channel {
+        type union {
+          type uint16 {
+            range "1..196";
+          }
+          type enumeration {
+            enum "auto" {
+              description "Automatic channel selection (ACS)";
+            }
+          }
+        }
+        default "auto";
+        description
+          "Operating channel number.
+
+           Required for Access Point mode.
+           Not used in Station mode (station uses AP's channel).
+
+           Channel availability depends on:
+           - Configured band (2.4/5/6 GHz)
+           - Regulatory domain (country-code)
+           - Hardware capabilities
+
+           Common channels:
+           - 2.4 GHz: 1-14 (channels 12-14 restricted in some countries)
+           - 5 GHz: 36, 40, 44, 48, 149, 153, 157, 161, 165 (varies by region)
+           - 6 GHz: 1-233 (WiFi 6E, where permitted)
+
+           Set to 'auto' for automatic channel selection.";
+      }
+
+      leaf band {
+        type wifi-band;
+        description
+          "Frequency band selection.
+
+           Required for Access Point mode.
+           Not used in Station mode (station uses AP's band).
+
+           Constraints:
+           - Hardware must support the selected band
+           - Regulatory domain affects channel availability
+           - PHY mode must be compatible with selected band
+
+           Recommendation: Use 5GHz for better performance and less
+           congestion in most environments.";
+      }
+
+      leaf probe-timeout {
+        type uint8;
+        description
+          "Seconds to wait for PHY detection at boot.
+
+           USB WiFi dongles may be slow to initialize due to firmware
+           loading. Set this to a non-zero value (e.g., 30) to wait
+           for the radio PHY to appear before creating WiFi interfaces.
+
+           If the PHY is not detected within the timeout, interface
+           creation is skipped gracefully instead of failing.
+
+           Value 0 (default) disables waiting.";
+      }
+
+      /*
+       * Operational state
+       */
+
+      leaf frequency {
+        config false;
+        type uint32;
+        units "MHz";
+        description
+          "Current operating frequency in MHz.
+
+           Derived from the configured channel and band.
+
+           Example values:
+           - 2412 MHz (channel 1, 2.4 GHz)
+           - 5180 MHz (channel 36, 5 GHz)
+           - 5955 MHz (channel 1, 6 GHz)";
+      }
+
+      leaf noise {
+        config false;
+        type int16;
+        units "dBm";
+        description
+          "Background noise level on current channel in dBm.
+
+           Lower (more negative) values indicate a cleaner RF environment.
+
+           Typical values:
+           - -95 to -100 dBm: Very low noise (excellent)
+           - -85 to -95 dBm: Low noise (good)
+           - -75 to -85 dBm: Moderate noise
+           - -65 to -75 dBm: High noise (congested)";
+      }
+
+      leaf-list supported-channels {
+        config false;
+        type uint16;
+        description
+          "List of channels supported by this radio in the current
+           regulatory domain.
+
+           Channels depend on:
+           - Hardware capabilities
+           - Configured country-code
+           - Band selection
+
+           This list reflects actual usable channels after applying
+           regulatory constraints.";
+      }
+
+      leaf max-txpower {
+        config false;
+        type uint8;
+        units "dBm";
+        description
+          "Maximum transmit power allowed by the regulatory domain
+           for the current channel.
+
+           This is the regulatory limit for the current band and channel.";
+      }
+
+      leaf num-virtual-interfaces {
+        config false;
+        type uint8;
+        description
+          "Number of virtual interfaces (AP/Station) currently
+           configured on this radio.";
+      }
+
+      leaf driver {
+        config false;
+        type string;
+        description
+          "WiFi driver name (e.g., mt798x-wmac, ath10k).";
+      }
+
+      container max-interfaces {
+        config false;
+        description
+          "Maximum number of virtual interfaces supported by this radio.";
+
+        leaf ap {
+          type uint8;
+          description
+            "Maximum number of AP interfaces.";
+        }
+
+        leaf station {
+          type uint8;
+          description
+            "Maximum number of station interfaces.";
+        }
+      }
+
+      list bands {
+        config false;
+        key "band";
+        description
+          "Supported frequency bands and their capabilities.";
+
+        leaf band {
+          type string;
+          description
+            "Band identifier from iw (e.g., '1' for 2.4GHz, '2' for 5GHz).";
+        }
+
+        leaf name {
+          type string;
+          description
+            "Human-readable band name (e.g., '2.4GHz', '5GHz', '6GHz').";
+        }
+
+        leaf ht-capable {
+          type boolean;
+          description
+            "High Throughput (802.11n) support.";
+        }
+
+        leaf vht-capable {
+          type boolean;
+          description
+            "Very High Throughput (802.11ac) support.";
+        }
+
+        leaf he-capable {
+          type boolean;
+          description
+            "High Efficiency (802.11ax/WiFi 6) support.";
+        }
+      }
+
+      /*
+       * Channel survey data (operational state)
+       */
+
+      container survey {
+        config false;
+        description
+          "WiFi channel survey data providing channel utilization
+           and interference information.
+
+           This data is collected from the WiFi driver and provides
+           insights into channel occupancy, noise levels, and RF activity.";
+
+        list channel {
+          key "frequency";
+          description
+            "Per-channel survey information.
+
+             Includes utilization metrics for all channels scanned by
+             the radio, not just the currently active channel.";
+
+          leaf frequency {
+            type uint32;
+            units "MHz";
+            description
+              "Channel center frequency in MHz.
+
+               Examples:
+               - 2412 MHz (2.4 GHz channel 1)
+               - 5180 MHz (5 GHz channel 36)
+               - 5955 MHz (6 GHz channel 1)";
+          }
+
+          leaf in-use {
+            type boolean;
+            description
+              "Whether this channel is currently in use by the radio.
+
+               Only one channel will have this set to true at a time.";
+          }
+
+          leaf noise {
+            type int16;
+            units "dBm";
+            description
+              "Background noise level on this channel in dBm.
+
+               Lower (more negative) values indicate cleaner RF environment.
+
+               Typical values:
+               - -95 to -100 dBm: Very low noise (excellent)
+               - -85 to -95 dBm: Low noise (good)
+               - -75 to -85 dBm: Moderate noise
+               - -65 to -75 dBm: High noise (congested)";
+          }
+
+          leaf active-time {
+            type uint32;
+            units "milliseconds";
+            description
+              "Total time the radio was active on this channel.
+
+               This is the survey measurement period for this channel.";
+          }
+
+          leaf busy-time {
+            type uint32;
+            units "milliseconds";
+            description
+              "Time the channel was detected as busy.
+
+               Includes time spent receiving frames, transmitting frames,
+               and time the channel was busy due to other sources.
+
+               Channel utilization = (busy-time / active-time) * 100%";
+          }
+
+          leaf receive-time {
+            type uint32;
+            units "milliseconds";
+            description
+              "Time spent receiving frames on this channel.
+
+               Subset of busy-time spent on frame reception.";
+          }
+
+          leaf transmit-time {
+            type uint32;
+            units "milliseconds";
+            description
+              "Time spent transmitting frames on this channel.
+
+               Subset of busy-time spent on frame transmission.";
+          }
+        }
+      }
+    }
+
+    /*
+     * GPS/GNSS Receiver configuration (when class = 'ih:gps')
+     */
+
+    container gps-receiver {
+      if-feature gps;
+      when "derived-from-or-self(../iehw:class, 'ih:gps')";
+      presence "GPS receiver configuration";
+      description
+        "GPS/GNSS receiver configuration and operational data.
+
+         This container is present when the hardware component represents
+         a GPS/GNSS receiver (class 'ih:gps'). GPS receivers provide
+         precision time via gpsd, which chronyd can use as a reference
+         clock through shared memory (SHM).
+
+         The hardware component name (e.g., 'gps0') determines:
+         - Device path: /dev/gps0 (symlink managed by udev)
+         - SHM unit: 0 for GPS time, 1 for PPS (derived from gpsN index)
+
+         Supported GNSS constellations depend on the hardware:
+         - GPS (US)
+         - GLONASS (Russia)
+         - Galileo (EU)
+         - BeiDou (China)";
+
+      /*
+       * Operational state from gpsd
+       */
+
+      leaf device {
+        config false;
+        type string;
+        description
+          "Actual device path being used (e.g., /dev/ttyUSB0, /dev/ttyACM0).
+           This is the physical device that /dev/gpsN symlinks to.";
+      }
+
+      leaf driver {
+        config false;
+        type string;
+        description
+          "GPS driver/protocol in use (e.g., 'u-blox', 'NMEA', 'SiRF').";
+      }
+
+      leaf activated {
+        config false;
+        type boolean;
+        description
+          "Whether gpsd has successfully activated this GPS device.";
+      }
+
+      leaf satellites-visible {
+        config false;
+        type uint8;
+        description
+          "Number of satellites currently visible to the receiver.";
+      }
+
+      leaf satellites-used {
+        config false;
+        type uint8;
+        description
+          "Number of satellites being used for the fix.";
+      }
+
+      leaf fix-mode {
+        config false;
+        type enumeration {
+          enum "none" {
+            description "No fix available";
+          }
+          enum "2d" {
+            description "2D fix (latitude/longitude only)";
+          }
+          enum "3d" {
+            description "3D fix (latitude/longitude/altitude)";
+          }
+        }
+        description
+          "Current GPS fix mode. A 3D fix is required for accurate time.";
+      }
+
+      leaf latitude {
+        config false;
+        type decimal64 {
+          fraction-digits 6;
+        }
+        units "degrees";
+        description
+          "Current latitude in decimal degrees. Negative values are south.";
+      }
+
+      leaf longitude {
+        config false;
+        type decimal64 {
+          fraction-digits 6;
+        }
+        units "degrees";
+        description
+          "Current longitude in decimal degrees. Negative values are west.";
+      }
+
+      leaf altitude {
+        config false;
+        type decimal64 {
+          fraction-digits 1;
+        }
+        units "meters";
+        description
+          "Current altitude above mean sea level in meters.";
+      }
+
+      leaf pps-available {
+        config false;
+        type boolean;
+        description
+          "Whether this GPS device provides a PPS (Pulse Per Second) signal.
+           PPS provides microsecond-level timing accuracy.";
       }
     }
   }

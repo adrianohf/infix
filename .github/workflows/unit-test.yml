@@ -1,0 +1,116 @@
+name: unit-test
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Build target (e.g. aarch64 or aarch64_minimal)"
+        default: "x86_64"
+        type: string
+      parallel:
+        description: 'Massive parallel build of each image'
+        default: true
+        type: boolean
+      name:
+        description: "Name (for spin overrides)"
+        default: "infix"
+        type: string
+      infix_repo:
+        description: 'Repo to checkout (for spin overrides)'
+        default: kernelkit/infix
+        type: string
+      infix_branch:
+        description: 'Branch/tag/commit to checkout (for spin overrides)'
+        default: ''
+        type: string
+
+  workflow_call:
+    inputs:
+      target:
+        required: true
+        type: string
+      name:
+        required: true
+        type: string
+      infix_repo:
+        required: false
+        type: string
+        default: kernelkit/infix
+      infix_branch:
+        required: false
+        type: string
+        default: ''
+        description: 'Branch/tag/commit to checkout (for spin overrides). Defaults to github.ref if not specified'
+      parallel:
+        required: false
+        type: boolean
+        default: true
+      pre_build_script:
+        required: false
+        type: string
+        default: ''
+        description: 'Optional script to run after checkout (for spin customization)'
+    secrets:
+      CHECKOUT_TOKEN:
+        required: false
+        description: 'Token for cross-repository access'
+
+env:
+  NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.name || inputs.name }}
+  TARGET: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || inputs.target }}
+  INFIX_REPO: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.infix_repo || inputs.infix_repo }}
+  INFIX_BRANCH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.infix_branch || inputs.infix_branch }}
+
+jobs:
+  unit-tests:
+    name: Build ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.name || inputs.name }} ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.target || inputs.target }}
+    runs-on: [ self-hosted, latest ]
+    env:
+      PARALLEL: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.parallel == 'true' || github.event_name != 'workflow_dispatch' && inputs.parallel == true }}
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Cleanup Build Folder
+        run: |
+          ls -la ./
+          rm -rf ./* || true
+          rm -rf ./.??* || true
+          ls -la ./
+
+      - name: Checkout infix repo
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ env.INFIX_REPO }}
+          ref: ${{ env.INFIX_BRANCH != '' && env.INFIX_BRANCH || github.ref }}
+          clean: true
+          fetch-depth: 0
+          submodules: recursive
+          token: ${{ secrets.CHECKOUT_TOKEN || github.token }}
+
+      - uses: kernelkit/actions/podman-cleanup@v1
+
+      - name: Run pre-build script
+        if: ${{ inputs.pre_build_script != '' }}
+        run: |
+          cat > ./pre-build.sh << 'EOF'
+          ${{ inputs.pre_build_script }}
+          EOF
+          chmod +x ./pre-build.sh
+          bash ./pre-build.sh
+
+      - uses: kernelkit/actions/cache-restore@v1
+        with:
+          target: ${{ env.TARGET }}
+
+      - name: Configure ${{ env.TARGET }}
+        run: |
+          make ${{ env.TARGET }}_defconfig
+
+      - name: Cleanup stale containers and ports
+        run: |
+          podman rm -af || true
+          pkill -9 -f rootlessport || true
+
+      - name: Unit Test ${{ env.TARGET }}
+        run: |
+          make test-unit

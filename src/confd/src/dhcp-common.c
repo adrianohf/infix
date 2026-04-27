@@ -1,0 +1,281 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+
+#include <ctype.h>
+#include <limits.h>
+#include <pwd.h>
+#include <sys/utsname.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+
+#include <srx/common.h>
+#include <srx/lyx.h>
+#include <srx/srx_val.h>
+
+#include <libyang/libyang.h>
+#include "core.h"
+#include "dhcp-common.h"
+
+int dhcp_option_lookup(const struct lyd_node *id)
+{
+	const struct lysc_type_enum *enum_type;
+	const struct lysc_type_union *uni;
+	const struct lysc_node_leaf *leaf;
+	const struct lysc_node *schema;
+	const struct lysc_type *type;
+	LY_ARRAY_COUNT_TYPE u, e;
+	const char *name;
+
+	schema = id->schema;
+	if (!schema || schema->nodetype != LYS_LEAF)
+		return -1;
+
+	leaf = (const struct lysc_node_leaf *)schema;
+	type = leaf->type;
+
+	if (type->basetype != LY_TYPE_UNION)
+		return -1;	/* We expect a union type */
+
+	uni = (const struct lysc_type_union *)type;
+	name = lyd_get_value(id);
+
+	/* Look through each type in the union */
+	for (u = 0; u < LY_ARRAY_COUNT(uni->types); u++) {
+		type = uni->types[u];
+
+		if (type->basetype == LY_TYPE_ENUM) {
+			enum_type = (const struct lysc_type_enum *)type;
+
+			for (e = 0; e < LY_ARRAY_COUNT(enum_type->enums); e++) {
+				if (!strcmp(enum_type->enums[e].name, name))
+					return enum_type->enums[e].value;
+			}
+		} else if (type->basetype == LY_TYPE_UINT8) {
+			char *endptr;
+			long val;
+
+			val = strtol(name, &endptr, 10);
+			if (*endptr == 0 && val > 0 && val < 255)
+				return (int)val;
+		} else if (type->basetype == LY_TYPE_UINT16) {
+			char *endptr;
+			long val;
+
+			val = strtol(name, &endptr, 10);
+			if (*endptr == 0 && val > 0 && val < 65536)
+				return (int)val;
+		}
+	}
+
+	return -1;
+}
+
+char *dhcp_hostname(struct lyd_node *cfg, char *str, size_t len)
+{
+	char hostname[HOST_NAME_MAX + 1] = { 0 };
+	struct lyd_node *node;
+	const char *fmt;
+
+	node = lydx_get_xpathf(cfg, "/ietf-system:system/hostname");
+	if (!node)
+		return NULL;
+
+	fmt = lyd_get_value(node);
+	if (!fmt || !fmt[0])
+		return NULL;
+
+	if (hostnamefmt(&confd, fmt, hostname, sizeof(hostname), NULL, 0) || !hostname[0])
+		return NULL;
+
+	snprintf(str, len, "-x hostname:%s ", hostname);
+
+	return str;
+}
+
+char *dhcp_fqdn(const char *val, char *str, size_t len)
+{
+	snprintf(str, len, "-F \"%s\" ", val);
+	return str;
+}
+
+char *dhcp_compose_option(struct lyd_node *cfg, const char *ifname, struct lyd_node *id,
+			  const char *val, const char *hex, char *option, size_t len,
+			  char *(*ip_cache_cb)(const char *, char *, size_t))
+{
+	const char *name = lyd_get_value(id);
+	int num = dhcp_option_lookup(id);
+
+	if (num == -1) {
+		ERROR("Failed looking up DHCP client %s option %s, skipping.", ifname, name);
+		return NULL;
+	}
+
+	/* Skip option 60 (vendor-class) - handled separately via -V flag */
+	if (num == 60)
+		return NULL;
+
+	if (val || hex) {
+		switch (num) {
+		case 81: /* fqdn */
+			if (!val)
+				return NULL;
+			return dhcp_fqdn(val, option, len);
+		case 12: /* hostname */
+			if (val && !strcmp(val, "auto"))
+				return dhcp_hostname(cfg, option, len);
+			/* fallthrough */
+		default:
+			if (hex) {
+				snprintf(option, len, "-x %d:", num);
+				strlcat(option, hex, len);
+				strlcat(option, " ", len);
+			} else {
+				/* string value */
+				snprintf(option, len, "-x %d:'\"%s\"' ", num, val);
+			}
+			break;
+		}
+	} else {
+		struct { int num; char *(*cb)(const char *, char *, size_t); } opt[] = {
+			{ 50, ip_cache_cb }, /* address */
+			{ 81, NULL        }, /* fqdn */
+		};
+
+		for (size_t i = 0; i < NELEMS(opt); i++) {
+			if (num != opt[i].num)
+				continue;
+
+			if (!opt[i].cb || !opt[i].cb(ifname, option, len))
+				return NULL;
+
+			return option;
+		}
+
+		snprintf(option, len, "-O %d ", num);
+	}
+
+	return option;
+}
+
+char *dhcp_compose_options(struct lyd_node *cfg, const char *ifname, char **options,
+			   struct lyd_node *id, const char *val, const char *hex,
+			   char *(*ip_cache_cb)(const char *, char *, size_t))
+{
+	char opt[300];
+
+	if (!dhcp_compose_option(cfg, ifname, id, val, hex, opt, sizeof(opt), ip_cache_cb))
+		return *options;
+
+	if (*options) {
+		char *opts;
+
+		opts = realloc(*options, strlen(*options) + strlen(opt) + 1);
+		if (!opts) {
+			ERRNO("failed reallocating options");
+			free(*options);
+			return NULL;
+		}
+
+		*options = strcat(opts, opt);
+	} else
+		*options = strdup(opt);
+
+	return *options;
+}
+
+/*
+ * Default DHCP options for udhcpc, from networking/udhcp/common.c OPTION_REQ
+ */
+static void infer_options_v4(sr_session_ctx_t *session, const char *xpath)
+{
+	sr_val_t val = { .type = SR_STRING_T };
+	struct json_t *product_name;
+	const char *opt[] = {
+		"netmask",
+		"broadcast",
+		"router",
+		"domain",
+		"dns-server",
+		"ntp-server" /* will not be activated unless ietf-system also is */
+	};
+	size_t i;
+
+	for (i = 0; i < NELEMS(opt); i++)
+		srx_set_item(session, NULL, 0, "%s/option[id='%s']", xpath, opt[i]);
+
+	/* server may use this to register our current name */
+	val.data.string_val = "auto";
+	srx_set_item(session, &val, 0, "%s/option[id='hostname']/value", xpath);
+
+	product_name = json_object_get(confd.root, "product-name");
+	if (product_name) {
+		val.data.string_val = (char *)json_string_value(product_name);
+		srx_set_item(session, &val, 0, "%s/option[id='vendor-class']/value", xpath);
+	}
+}
+
+/*
+ * Default DHCPv6 options
+ * Note: odhcp6c uses numeric option codes for all options.
+ */
+static void infer_options_v6(sr_session_ctx_t *session, const char *xpath)
+{
+	const char *opt[] = {
+		"dns-server",      /* option 23 */
+		"domain-search",   /* option 24 */
+		"client-fqdn",     /* option 39 */
+		"ntp-server"       /* option 56 */
+	};
+	size_t i;
+
+	for (i = 0; i < NELEMS(opt); i++)
+		srx_set_item(session, NULL, 0, "%s/option[id='%s']", xpath, opt[i]);
+}
+
+/*
+ * Called from interfaces.c ifchange_cand() to infer DHCP options
+ * for both DHCPv4 and DHCPv6 client configurations
+ */
+int ifchange_cand_infer_dhcp(sr_session_ctx_t *session, const char *xpath)
+{
+	sr_error_t err = SR_ERR_OK;
+	char *path, *ptr;
+	size_t cnt = 0;
+
+	/* Extract path up to and including the dhcp container */
+	path = strdup(xpath);
+	if (!path)
+		return SR_ERR_SYS;
+
+	/* Find the dhcp container in the path */
+	ptr = strstr(path, ":dhcp");
+	if (!ptr) {
+		free(path);
+		return SR_ERR_OK;
+	}
+
+	/* Move past ":dhcp" to find end of container name */
+	ptr += 5; /* strlen(":dhcp") */
+
+	/* If there's more after dhcp (like /arping), truncate it */
+	if (*ptr == '/')
+		*ptr = '\0';
+
+	/* Check if options already exist */
+	err = srx_nitems(session, &cnt, "%s/option", path);
+	if (err) {
+		ERROR("%s(): failed querying %s/option: %d", __func__, path, err);
+		goto out;
+	}
+	if (cnt)
+		goto out;
+
+	/* Infer options based on IPv4 or IPv6 */
+	if (strstr(path, ":ipv4/"))
+		infer_options_v4(session, path);
+	else if (strstr(path, ":ipv6/"))
+		infer_options_v6(session, path);
+
+out:
+	free(path);
+	return err;
+}

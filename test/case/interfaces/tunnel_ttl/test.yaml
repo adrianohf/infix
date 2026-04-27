@@ -1,0 +1,11 @@
+---
+- settings:
+    test-spec: <case>.adoc
+
+- name: GRE Tunnel TTL Verification
+  case: gre.py
+  opts: ["--tunnel", "gre"]
+
+- name: VXLAN Tunnel TTL Verification
+  case: vxlan.py
+  opts: ["--tunnel", "vxlan"]

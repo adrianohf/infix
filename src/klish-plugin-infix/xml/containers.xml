@@ -102,9 +102,14 @@
   </COMMAND>
 
   <COMMAND name="remove" help="Remove a container image from local storage">
-    <PARAM name="name" ptype="/IMAGES" help="Image name" />
+    <SWITCH name="optional" min="0">
+      <PARAM name="name" ptype="/IMAGES" help="Image name" />
+    </SWITCH>
     <ACTION sym="script" in="tty" out="tty" interrupt="true">
-      doas container remove $KLISH_PARAM_name
+      if [ -n "$KLISH_PARAM_name" ]; then
+        all=-a
+      fi
+      doas container $all remove $KLISH_PARAM_name
     </ACTION>
   </COMMAND>
 
@@ -173,22 +178,25 @@
   </COMMAND>
 
   <COMMAND name="upgrade" help="Upgrade image of a container (writable layer is lost!)">
-    <PARAM name="name" ptype="/CONTAINERS" help="Container name" />
+    <PARAM name="name" ptype="/CONTAINERSa" help="Container name" />
+    <SWITCH name="optional" min="0" max="1">
+      <COMMAND name="reset-volumes" help="Delete named volumes, re-initialize from new image (all config lost!)" />
+    </SWITCH>
     <ACTION sym="script" out="tty" interrupt="true">
-      doas container upgrade $KLISH_PARAM_name
+      if env | grep -q 'reset-volumes' >/dev/null; then
+          opt="-R"
+      fi
+      doas container $opt upgrade $KLISH_PARAM_name
     </ACTION>
   </COMMAND>
 </COMMAND>
 
 <COMMAND name="show" help="Show system status and configuration files" mode="switch">
-  <COMMAND name="container" help="Show container status">
-    <ACTION sym="script" in="tty" out="tty" interrupt="true">
-      doas container show |pager
-    </ACTION>
 
-    <SWITCH name="optional" min="0">
+  <COMMAND name="container" help="Show container status">
+    <SWITCH name="subcommands" min="0">
       <COMMAND name="all" help="Show all containers (default only running)">
-        <ACTION sym="script">doas container -a show</ACTION>
+        <ACTION sym="script">show container</ACTION>
       </COMMAND>
       <COMMAND name="log" help="Show container log (jumps to end), alias to 'show log container'">
 	<ACTION sym="script" in="tty" out="tty" interrupt="true">
@@ -226,7 +234,15 @@
 	</ACTION>
       </COMMAND>
     </SWITCH>
+
+    <SWITCH name="optional" min="0" max="1">
+      <PARAM name="name" ptype="/CONTAINERS" help="Container name for detailed view" />
+    </SWITCH>
+    <ACTION sym="script" in="tty" out="tty" interrupt="true">
+      show container $KLISH_PARAM_name |pager
+    </ACTION>
   </COMMAND>
+
 </COMMAND>
 
 </VIEW>

@@ -22,6 +22,37 @@ module infix-containers {
     prefix infix-sys;
   }
 
+  revision 2026-04-20 {
+    description "Add cmdline operational leaf showing the full process command line
+                 (entrypoint + args) from 'podman inspect'.  Allow environment variable
+                 references (dollar sign, braces) in the command override.";
+    reference "internal";
+  }
+
+  revision 2026-02-23 {
+    description "Input validation improvements";
+    reference "internal";
+  }
+
+  revision 2025-12-09 {
+    description "Add resource management:
+                  - Add resource-limit container with memory and cpu configuration.
+                  - Add resource-usage operational data for live resource usage statistics.";
+    reference "internal";
+  }
+
+  revision 2025-10-12 {
+    description "Two major changes:
+                  - Add dedicated 'ident' type for container and volume names.
+                  - New upgrade action (RPC) for containers with :latest image.";
+    reference "internal";
+  }
+
+  revision 2025-06-25 {
+    description "Add file mode option to content mounts, allows creating scripts.";
+    reference "internal";
+  }
+
   revision 2025-05-14 {
     description
       "Validation improvement:
@@ -56,6 +87,25 @@ module infix-containers {
   /*
    * Typedefs
    */
+
+  typedef ident {
+    description "Container name or volume identifiers may not contain spaces.";
+    type string {
+      length "2..64";
+      pattern '[a-zA-Z0-9][a-zA-Z0-9_.-]+';
+    }
+  }
+
+
+  typedef image-reference {
+    description "OCI image reference or transport URI.
+                 Allows registry references (e.g., quay.io/user/image:tag),
+                 transport prefixes (docker://, oci-archive:, dir:), and
+                 download URLs (ftp://, http://, https://).";
+    type string {
+      pattern '[a-zA-Z0-9][a-zA-Z0-9_./:@=+%~-]*';
+    }
+  }
 
   typedef mount-type {
     type enumeration {
@@ -123,7 +173,7 @@ module infix-containers {
 
       leaf name {
 	description "Name of the container";
-	type string;
+	type ident;
       }
 
       leaf id {
@@ -154,7 +204,7 @@ module infix-containers {
                            container will be put on a queue that retries pull every time
                            there is a route change in the host's system.";
 	mandatory true;
-	type string;
+	type image-reference;
       }
 
       container checksum {
@@ -213,7 +263,18 @@ module infix-containers {
 
       leaf command {
 	description "Override ENTRYPOINT from image and run command + args.";
-	type string;
+	type string {
+	  pattern '[a-zA-Z0-9_./ :=@%^,${}()+-]+';
+	}
+      }
+
+      leaf cmdline {
+        description "Full process command line currently executing in the container,
+                     combining the entrypoint and its arguments as reported by
+                     'podman inspect'.  May differ from the configured 'command'
+                     override when the image provides its own entrypoint wrapper.";
+        config false;
+        type string;
       }
 
       leaf hostname {
@@ -271,7 +332,9 @@ module infix-containers {
                          NOTE: Some (*) options only work with masquerading container bridges,
                                which automatically create VETH pairs with one end in the host
                                bridge and the other in the container.";
-            type string;
+            type string {
+              pattern '[a-zA-Z_][a-zA-Z0-9_]*=[a-zA-Z0-9.:_/-]+';
+            }
           }
         }
 
@@ -283,7 +346,9 @@ module infix-containers {
                          Sample: 8080:80           -- forward tcp port 8080 to container port 80
                                  69:69/udp         -- forward udp port 69 to container port 69
                                  127.0.0.1:8080:80 -- forward only from loopback interface";
-          type string;
+          type string {
+            pattern '[0-9.:\[\]]+(/[a-zA-Z]+)?';
+          }
         }
 
         leaf-list dns {
@@ -321,6 +386,86 @@ module infix-containers {
 	}
       }
 
+      container resource-limit {
+	description "Resource limits for the container.";
+
+	leaf memory {
+	  description "Maximum memory limit in kibibytes, default: unlimited.";
+	  type uint64;
+	  units "KiB";
+	}
+
+	leaf cpu {
+	  description "CPU limit in millicores, default: unlimited.
+
+                       Millicores represent thousandths of a CPU core:
+                         500  = 0.5 cores (50% of one core)
+                         1000 = 1.0 cores (one full core)
+                         2000 = 2.0 cores (two full cores)
+                         3500 = 3.5 cores
+
+                       This is converted to cgroup cpu.quota internally.";
+	  type uint32;
+	  units "millicores";
+	}
+      }
+
+      container resource-usage {
+	description "Runtime container resource usage statistics.";
+	config false;
+
+	leaf memory {
+	  description "Used memory in kibibytes.";
+	  type uint64;
+	  units "KiB";
+	}
+
+	leaf cpu {
+	  description "CPU usage percentage.";
+	  type decimal64 {
+	    fraction-digits 2;
+	  }
+	  units "percent";
+	}
+
+	container block-io {
+	  description "Block I/O statistics";
+
+	  leaf read {
+	    description "Block I/O read in kibibytes.";
+	    type uint64;
+	    units "KiB";
+	  }
+
+	  leaf write {
+	    description "Block I/O write in kibibytes.";
+	    type uint64;
+	    units "KiB";
+	  }
+	}
+
+	container net-io {
+	  description "Network I/O statistics";
+
+	  leaf received {
+	    description "Network I/O received in kibibytes.";
+	    type uint64;
+	    units "KiB";
+	  }
+
+	  leaf sent {
+	    description "Network I/O sent in kibibytes.";
+	    type uint64;
+	    units "KiB";
+	  }
+	}
+
+	leaf pids {
+	  description "Number of processes/threads.";
+	  type uint32;
+	}
+      }
+
       list mount {
         description "Files, content, and directories to mount inside container.";
         key name;
@@ -339,7 +484,7 @@ module infix-containers {
 
                        For persistent writable directories, *volumes* may be a
                        better fit for your container and easier to set up.";
-          type string;
+          type ident;
         }
 
         leaf type {
@@ -357,7 +502,7 @@ module infix-containers {
                        When mounting files, directories (and globs) from the host,
                        the source must be an absolute path.";
               type string {
-                pattern '/.*';
+                pattern '/[a-zA-Z0-9_./*?-]+([ ]?[a-zA-Z0-9_./*?-]+)*';
               }
             }
           }
@@ -386,7 +531,17 @@ module infix-containers {
                        or import the text file using the 'content' node.";
           mandatory true;
           type string {
-            pattern '/.*';
+            pattern '/[a-zA-Z0-9_./-]+(/[a-zA-Z0-9_./-]+)*';
+          }
+        }
+
+        leaf mode {
+          description "File permissions for content mounts (not used for source mounts).
+
+                       Octal notation (e.g., '755', '0644', '4755').  When not specified,
+                       the mode will be '0644'.";
+          type string {
+            pattern '0?[0-7]{3,4}';
           }
         }
 
@@ -421,17 +576,14 @@ module infix-containers {
                        with the contents of the container's file system on first
                        use.  Hence, upgrading the container image will not update
                        the volume if the image has new/removed files at 'path'.";
-	  type string {
-            pattern '[a-zA-Z_][a-zA-Z0-9_]*';
-            length "1..64";
-          }
+	  type ident;
 	}
 
 	leaf target {
 	  description "Absolute path to target destination directory inside the container.";
 	  mandatory true;
           type string {
-            pattern '/.*';
+            pattern '/[a-zA-Z0-9_./-]+(/[a-zA-Z0-9_./-]+)*';
           }
 	}
       }
@@ -459,6 +611,18 @@ module infix-containers {
       action restart {
         description "Restart a running, or start, a stopped container.";
       }
+
+      action upgrade {
+        description "Upgrade container to latest version of its image.
+
+                     This action fetches the latest version of the container's image
+                     and recreates the container with the new image. Any named volumes
+                     are preserved.
+
+                     Note: This action is primarily for containers using mutable tags
+                           like ':latest'.  For containers using immutable tags (e.g.,
+                           ':25.06.0'), the upgrade action will have no effect.";
+      }
     }
   }
 
@@ -467,12 +631,12 @@ module infix-containers {
     input {
       leaf uri {
         description "The URL or local file path, e.g., /lib/oci/archive.tar.gz";
-        type string;
+        type image-reference;
         mandatory true;
       }
       leaf name {
         description "Image name[:tag], default: basename of archive dir + :latest";
-        type string;
+        type image-reference;
       }
     }
   }

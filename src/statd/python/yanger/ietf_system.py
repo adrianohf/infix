@@ -36,6 +36,29 @@ def get_boot_order():
     return order
 
 def add_ntp(out):
+    """Add NTP source information from chronyc sources.
+
+    The chronyc -c sources output is CSV with the following fields:
+      [0] Mode indicator:
+          ^  server (we're a client to this source)
+          =  peer (symmetric mode)
+          #  local reference clock (GPS, PPS, etc.) - skipped, no IP address
+      [1] State indicator:
+          *  selected (current sync source)
+          +  candidate
+          -  outlier
+          ?  unusable
+          x  falseticker
+          ~  unstable
+      [2] Address (IP address or refclock name like "GPS")
+      [3] Stratum
+      [4] Poll interval (log2 seconds)
+      [5] Reach (octal reachability register)
+      [6] LastRx (seconds since last response)
+      [7] Last offset (seconds)
+      [8] Offset at last update (seconds)
+      [9] Error estimate (seconds)
+    """
     data = HOST.run_multiline(["chronyc", "-c", "sources"], [])
     source = []
     state_mode_map = {
@@ -54,6 +77,9 @@ def add_ntp(out):
     for line in data:
         src = {}
         line = line.split(',')
+        # Skip reference clocks (mode "#") as they have names like "GPS" instead of IP addresses
+        if line[0] == "#":
+            continue
         src["address"] = line[2]
         src["mode"] = state_mode_map[line[0]]
         src["state"] = source_state_map[line[1]]
@@ -62,6 +88,7 @@ def add_ntp(out):
         source.append(src)
 
     insert(out, "infix-system:ntp", "sources", "source", source)
+
 
 def add_dns(out):
     options = {}
@@ -177,6 +204,28 @@ def add_platform(out):
 
     insert(out, "platform", platform)
 
+def add_services(out):
+    data = HOST.run_json(["initctl", "-j"], [])
+    services = []
+
+    for d in data:
+        try:
+            services.append({
+                "pid": d["pid"],
+                "name": d["identity"],
+                "status": d["status"],
+                "description": d["description"],
+                "statistics": {
+                    "memory-usage": str(d.get("memory", 0)),
+                    "uptime": str(d.get("uptime", 0)),
+                    "restart-count": int(d.get("restarts", 0))
+                }
+            })
+        except KeyError:
+            continue
+
+    insert(out, "infix-system:services", "service", services)
+
 def add_software(out):
     software = {}
     try:
@@ -239,27 +288,74 @@ def add_timezone(out):
 
 
 def add_users(out):
-    shadow_output = HOST.run_multiline(["getent", "shadow"], [])
-    users = []
+    # Map shell paths to YANG identity names
+    shell_map = {
+        "/bin/bash": "infix-system:bash",
+        "/bin/sh": "infix-system:sh",
+        "/usr/bin/clish": "infix-system:clish",
+        "/bin/false": "infix-system:false",
+        "/sbin/nologin": "infix-system:false",
+        "/usr/sbin/nologin": "infix-system:false",
+    }
 
+    # Get users from /etc/passwd - include users with 1000 <= uid < 10000 (added by confd)
+    passwd_output = HOST.run_multiline(["getent", "passwd"], [])
+    passwd_users = {}
+    for line in passwd_output:
+        parts = line.split(':')
+        if len(parts) >= 7:
+            username = parts[0]
+            uid = int(parts[2]) if parts[2].isdigit() else 0
+            shell = parts[6].strip()
+            if 1000 <= uid < 10000:
+                passwd_users[username] = shell_map.get(shell, "infix-system:false")
+
+    # Get password hashes from shadow
+    shadow_output = HOST.run_multiline(["getent", "shadow"], [])
+    shadow_hashes = {}
     for line in shadow_output:
         parts = line.split(':')
-        if len(parts) < 2:
-            continue
-        username = parts[0]
-        password_hash = parts[1]
+        if len(parts) >= 2:
+            username = parts[0]
+            password_hash = parts[1]
+            # Only include valid password hashes (not locked/disabled)
+            if (password_hash and
+                not password_hash.startswith('*') and
+                not password_hash.startswith('!')):
+                shadow_hashes[username] = password_hash
 
-        # Skip any records that do not pass YANG validation
-        if (not password_hash or
-            password_hash.startswith('0') or
-            password_hash.startswith('*') or
-            password_hash.startswith('!')):
-            continue
-        user = {}
-        user["name"] = username
-        user["password"] = password_hash
+    # Build user list from passwd users (1000 <= uid < 10000)
+    users = []
+    for username, shell in passwd_users.items():
+        user = {"name": username}
+        if username in shadow_hashes:
+            user["password"] = shadow_hashes[username]
+        user["infix-system:shell"] = shell
+
+        # Read SSH authorized keys from /var/run/sshd/${user}.keys
+        keys_file = f"/var/run/sshd/{username}.keys"
+        keys_content = HOST.read(keys_file)
+        if keys_content:
+            authorized_keys = []
+            for line in keys_content.splitlines():
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                parts = line.split(None, 2)
+                if len(parts) >= 2:
+                    algorithm = parts[0]
+                    key_data = parts[1]
+                    # Use comment as key name, or generate one
+                    key_name = parts[2] if len(parts) > 2 else f"{username}-key-{len(authorized_keys)}"
+                    authorized_keys.append({
+                        "name": key_name,
+                        "algorithm": algorithm,
+                        "key-data": key_data
+                    })
+            if authorized_keys:
+                user["authorized-key"] = authorized_keys
+
         users.append(user)
-
 
     insert(out, "authentication", "user", users)
 
@@ -273,6 +369,74 @@ def add_clock(out):
     clock["boot-datetime"] = str(clock_now.from_seconds(uptime))
     clock["current-datetime"] = str(clock_now)
     insert(out, "clock", clock)
+
+def add_resource_usage(out):
+    """Add system resource usage (memory, load average, filesystem) to system-state"""
+    resource = {}
+
+    # Memory usage
+    try:
+        meminfo = HOST.read("/proc/meminfo")
+        if not meminfo:
+            return
+        mem_info = {}
+        for line in meminfo.splitlines():
+            parts = line.split(":")
+            if len(parts) == 2:
+                key = parts[0].strip()
+                value = parts[1].strip()
+                if key in ["MemTotal", "MemFree", "MemAvailable"]:
+                    # Store in KiB (as provided by /proc/meminfo, mislabeled as kB)
+                    mem_info[key] = int(value.split()[0])
+
+        if mem_info:
+            memory = {}
+            if "MemTotal" in mem_info:
+                memory["total"] = str(mem_info["MemTotal"])
+            if "MemFree" in mem_info:
+                memory["free"] = str(mem_info["MemFree"])
+            if "MemAvailable" in mem_info:
+                memory["available"] = str(mem_info["MemAvailable"])
+            resource["memory"] = memory
+    except (FileNotFoundError, ValueError):
+        pass
+
+    # Load average
+    try:
+        loadavg = HOST.read("/proc/loadavg")
+        load_parts = loadavg.strip().split()
+        if len(load_parts) >= 3:
+            load = {
+                "load-1min": load_parts[0],
+                "load-5min": load_parts[1],
+                "load-15min": load_parts[2]
+            }
+            resource["load-average"] = load
+    except (FileNotFoundError, ValueError):
+        pass
+
+    # Filesystem usage
+    filesystems = []
+    for mount in ["/", "/var", "/cfg"]:
+        try:
+            result = HOST.run_multiline(["df", "-k", mount], [])
+            if len(result) > 1:
+                parts = result[1].split()
+                if len(parts) >= 4:
+                    filesystems.append({
+                        "mount-point": mount,
+                        "size": str(parts[1]),
+                        "used": str(parts[2]),
+                        "available": str(parts[3])
+                    })
+        except (subprocess.CalledProcessError, ValueError, IndexError):
+            pass
+
+    if filesystems:
+        resource["filesystem"] = filesystems
+
+    if resource:
+        insert(out, "infix-system:resource-usage", resource)
 
 def operational():
     out = {
@@ -291,5 +455,7 @@ def operational():
     add_dns(out_state)
     add_clock(out_state)
     add_platform(out_state)
+    add_services(out_state)
+    add_resource_usage(out_state)
 
     return out

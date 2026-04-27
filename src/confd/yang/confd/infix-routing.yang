@@ -15,11 +15,49 @@ module infix-routing {
   import ietf-ospf {
     prefix ospf;
   }
+  import ietf-bfd-types {
+    prefix bfd-types;
+  }
+  import ietf-rip {
+    prefix rip;
+  }
 
   organization "KernelKit";
   contact      "kernelkit@googlegroups.com";
-  description  "Deviations and augments for ietf-routing and ietf-ospf.";
+  description  "Deviations and augments for ietf-routing, ietf-ospf, and ietf-rip.";
 
+  revision 2026-03-11 {
+    description "Remove interface-type deviation to expose standard ietf-ospf
+                 interface types including point-to-multipoint and hybrid.
+                 Un-deviate static-neighbors for non-broadcast P2MP support.";
+  }
+
+  revision 2025-12-02 {
+    description "Add configurable OSPF debug logging container.
+                 Add RIP (Routing Information Protocol) support.";
+    reference "RFC 8695";
+  }
+
+  revision 2025-11-12 {
+    description "Add area-id augmentation to OSPF local-rib routes.
+                 Add uptime, role, and interface-name augmentations to OSPF neighbor state.
+                 Allows displaying which area a route was learned from,
+                 how long neighbors have been up, their DR/BDR role, and
+                 the interface with local address.";
+    reference "Issue #1190";
+  }
+
+  revision 2025-11-11 {
+    description "Add BFD IP single-hop support (RFC 9127).
+                 Deviate session-statistics (not implemented yet).";
+    reference "RFC 9127, Issue #1190";
+  }
+  revision 2025-11-10 {
+    description "Add must constraint to prevent backbone area as stub/NSSA.
+                 Enable OSPF operational data for CLI: un-deviate priority,
+                 hello-timer, wait-timer, route metric and route-tag fields.";
+    reference "RFC 2328, RFC 3101, Issue #1190";
+  }
   revision 2024-11-27 {
     description "Deviate address-family in OSPF";
     reference "internal";
@@ -79,10 +117,6 @@ module infix-routing {
   }
 
   /* General routing */
-  deviation "/rt:routing/rt:interfaces" {
-    description "Initial limitation";
-    deviate not-supported;
-  }
 
   deviation "/rt:routing/rt:router-id" {
     description "Set in OSPF";
@@ -102,7 +136,10 @@ module infix-routing {
   typedef infix-distribute-protocol {
     type enumeration {
       enum ospf {
-        description "Redistribute Ospf";
+        description "Redistribute OSPF routes";
+      }
+      enum rip {
+        description "Redistribute RIP routes";
       }
       enum static {
         description "Redistribute Static routes";
@@ -119,13 +156,24 @@ module infix-routing {
   identity ospfv2 {
     base ospf:ospfv2;
     base infix-routing-type;
-    description "OSPv2 (IPv4) routing protocol";
+    description "OSPFv2 (IPv4) routing protocol";
+  }
+  identity ripv2 {
+    base rip:ripv2;
+    base infix-routing-type;
+    description "RIPv2 (IPv4) routing protocol";
+  }
+  identity bfdv1 {
+    base bfd-types:bfdv1;
+    base infix-routing-type;
+    description "BFD protocol version 1";
   }
   identity static {
     base rt:static;
     base infix-routing-type;
     description "Static route";
   }
+
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rt:type" {
     deviate replace {
       type identityref {
@@ -205,18 +253,6 @@ module infix-routing {
   }
 
   /* OSPF */
-  typedef infix-ospf-interface-type {
-    type enumeration {
-      enum broadcast {
-        description
-          "Specifies an OSPF broadcast multi-access network.";
-      }
-      enum point-to-point {
-        description
-          "Specifies an OSPF point-to-point network.";
-      }
-    }
-  }
 
 
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol" {
@@ -278,6 +314,45 @@ module infix-routing {
       }
     }
   }
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf" {
+    description "Add support for configurable OSPF debug logging.
+                 Allows users to enable specific OSPF debug categories for troubleshooting.
+                 All debug options default to disabled to prevent log flooding in
+                 production environments.";
+    container debug {
+      description "OSPF debug logging configuration";
+      leaf bfd {
+        type boolean;
+        default false;
+        description "Enable OSPF BFD (Bidirectional Forwarding Detection) debug messages";
+      }
+      leaf packet {
+        type boolean;
+        default false;
+        description "Enable detailed OSPF packet debug messages (all packet types)";
+      }
+      leaf ism {
+        type boolean;
+        default false;
+        description "Enable OSPF Interface State Machine debug messages";
+      }
+      leaf nsm {
+        type boolean;
+        default false;
+        description "Enable OSPF Neighbor State Machine debug messages";
+      }
+      leaf default-information {
+        type boolean;
+        default false;
+        description "Enable OSPF default route origination debug messages";
+      }
+      leaf nssa {
+        type boolean;
+        default false;
+        description "Enable OSPF NSSA (Not-So-Stubby Area) debug messages";
+      }
+    }
+  }
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface" {
     deviate add {
       must "count(../../../../ospf:areas/ospf:area/ospf:interfaces/ospf:interface[ospf:name=current()/name]) <= 1" {
@@ -286,11 +361,6 @@ module infix-routing {
     }
   }
 
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:interface-type" {
-    deviate replace {
-      type infix-ospf-interface-type;
-    }
-  }
 
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:auto-cost" {
     deviate not-supported;
@@ -348,6 +418,19 @@ module infix-routing {
   }
 
   /* OSPF Area */
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:area-type" {
+    deviate add {
+      must "(../ospf:area-id != '0.0.0.0') or "
+         + "(derived-from-or-self(., 'ospf:normal-area'))" {
+        error-message "Area 0.0.0.0 (backbone) cannot be configured as "
+                    + "stub or NSSA.";
+        description
+          "The backbone area (area 0.0.0.0) must be a normal area. "
+        + "It cannot be configured as a stub area or NSSA as per "
+        + "RFC 2328 and RFC 3101.";
+      }
+    }
+  }
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:virtual-links" {
     deviate not-supported;
   }
@@ -368,17 +451,13 @@ module infix-routing {
     deviate not-supported;
   }
 
-  /* OSPF Local RIB */
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:local-rib/ospf:route/ospf:metric" {
-    deviate not-supported;
-  }
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:local-rib/ospf:route/ospf:route-tag" {
-    deviate not-supported;
-  }
   /* OSPF Area Interface */
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:static-neighbors"
-  {
-    deviate not-supported;
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:static-neighbors/ospf:neighbor" {
+    deviate add {
+      must "../../ospf:interface-type = 'point-to-multipoint' or ../../ospf:interface-type = 'non-broadcast'" {
+        error-message "Static neighbors are only applicable to point-to-multipoint or non-broadcast interface types.";
+      }
+    }
   }
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:multi-areas"    {
     deviate not-supported;
@@ -396,7 +475,12 @@ module infix-routing {
   }
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:priority"
   {
-    deviate not-supported;
+    deviate add {
+      default "1";
+    }
+    description
+      "FRR uses a default priority of 1 for DR/BDR election.
+       Setting default to match FRR behavior.";
   }
   deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:fast-reroute"
   {
@@ -457,14 +541,6 @@ module infix-routing {
   {
     deviate not-supported;
   }
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:hello-timer"
-  {
-    deviate not-supported;
-  }
-  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/ospf:wait-timer"
-  {
-    deviate not-supported;
-  }
 
   /* OSPF RPCs */
   deviation "/ospf:clear-neighbor" {
@@ -512,4 +588,267 @@ module infix-routing {
     deviate not-supported;
   }
 
+  /* RIP */
+  /* RIP features not supported in Infix/FRR */
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:originate-default-route/rip:route-policy" {
+    deviate not-supported;
+    description "Route policies are not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:triggered-update-threshold" {
+    deviate not-supported;
+    description "Triggered update threshold is not supported in FRR.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:maximum-paths" {
+    deviate not-supported;
+    description "Maximum paths configuration is not supported in FRR.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:output-delay" {
+    deviate not-supported;
+    description "Output delay configuration is not supported in FRR.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:distribute-list" {
+    deviate not-supported;
+    description "Distribute lists are not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:redistribute" {
+    deviate not-supported;
+    description "Use Infix-specific redistribute container instead.";
+  }
+
+  /* RIP Interface features not supported */
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:authentication" {
+    deviate not-supported;
+    description "RIP authentication is not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:bfd" {
+    deviate not-supported;
+    description "BFD support for RIP is not available in FRR.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:no-listen" {
+    deviate not-supported;
+    description "No-listen mode is not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:originate-default-route" {
+    deviate not-supported;
+    description "Per-interface default route origination is not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:summary-address" {
+    deviate not-supported;
+    description "Summary addresses are not supported.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:timers" {
+    deviate not-supported;
+    description "Per-interface timers are not supported in FRR.";
+  }
+
+  /* RIP Operational state not supported */
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:interfaces/rip:interface/rip:statistics" {
+    deviate not-supported;
+    description "Per-interface statistics are not collected.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:next-triggered-update" {
+    deviate not-supported;
+    description "Next triggered update information is not available.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:num-of-routes" {
+    deviate not-supported;
+    description "Number of routes is not tracked separately.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:ipv6" {
+    deviate not-supported;
+    description "RIPng (IPv6) is not currently supported in Infix.";
+  }
+
+  deviation "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip/rip:statistics" {
+    deviate not-supported;
+    description "Global statistics are not collected.";
+  }
+
+  /* RIP RPC */
+  deviation "/rip:clear-rip-route" {
+    deviate not-supported;
+    description "Clear RIP route RPC is not supported.";
+  }
+
+  /* RIP Augmentations */
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip" {
+    description "Infix-specific redistribute container for RIP.
+                 The standard ietf-rip redistribute container has complex protocol-specific
+                 lists (bgp, isis, ospfv2, etc.), but Infix uses a simpler model similar to OSPF.";
+    container redistribute {
+      list redistribute {
+        key "protocol";
+        description "Redistribute protocols into RIP";
+        leaf protocol {
+          type infix-distribute-protocol;
+          description "Set protocol to redistribute";
+        }
+      }
+    }
+  }
+
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/rip:rip" {
+    description "Add support for configurable RIP debug logging.
+                 Allows users to enable specific RIP debug categories for troubleshooting.
+                 All debug options default to disabled to prevent log flooding in
+                 production environments.";
+    container debug {
+      description "RIP debug logging configuration";
+      leaf events {
+        type boolean;
+        default false;
+        description "Enable RIP events debug messages (sending/receiving packets, timers, interface changes)";
+      }
+      leaf packet {
+        type boolean;
+        default false;
+        description "Enable detailed RIP packet debug messages (packet dumps with origin and port)";
+      }
+      leaf kernel {
+        type boolean;
+        default false;
+        description "Enable kernel routing table debug messages (route add/delete, interface updates)";
+      }
+    }
+  }
+
+  /* Add send/receive version control per RIP interface
+   * The standard ietf-rip model doesn't include version control,
+   * but FRR supports this and it's useful for controlling RIP protocol versions
+   * on a per-interface basis (e.g., for NBMA links or mixed networks).
+   */
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/"
+        + "rip:rip/rip:interfaces/rip:interface" {
+    when "derived-from-or-self(../../../rt:type, 'infix-routing:ripv2')" {
+      description
+        "This augmentation is only valid for RIPv2.";
+    }
+    description
+      "Infix extension to add RIP version control per interface.";
+
+    leaf send-version {
+      type enumeration {
+        enum "1" {
+          description "Send RIPv1 packets";
+        }
+        enum "2" {
+          description "Send RIPv2 packets";
+        }
+        enum "1-2" {
+          description "Send both RIPv1 and RIPv2 packets";
+        }
+      }
+      description
+        "RIP version to send on this interface. If not configured, FRR defaults to version 2.";
+    }
+
+    leaf receive-version {
+      type enumeration {
+        enum "1" {
+          description "Receive RIPv1 packets";
+        }
+        enum "2" {
+          description "Receive RIPv2 packets";
+        }
+        enum "1-2" {
+          description "Receive both RIPv1 and RIPv2 packets";
+        }
+      }
+      description
+        "RIP version to receive on this interface. If not configured, FRR defaults to version 2.";
+    }
+  }
+
+  /*
+   * Augmentations
+   */
+
+  /* Add area-id to OSPF local-rib routes
+   * The standard ietf-ospf model doesn't include area information in routes,
+   * but FRR provides this and it's useful for operators to see which area
+   * a route was learned from.
+   */
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/"
+        + "ospf:ospf/ospf:local-rib/ospf:route" {
+    when "derived-from-or-self(../../../rt:type, 'infix-routing:ospfv2')" {
+      description
+        "This augmentation is only valid for OSPFv2.";
+    }
+    description
+      "Infix extension to add area information to OSPF routes.";
+
+    leaf area-id {
+      type ospf:area-id-type;
+      config false;
+      description
+        "Area ID from which this route was learned. Not applicable
+         for inter-area routes learned from area border routers or
+         external routes.";
+    }
+  }
+
+  /* Add uptime to OSPF neighbor operational state
+   * The standard ietf-ospf model doesn't include neighbor uptime,
+   * but FRR provides this and it's useful for monitoring neighbor stability.
+   */
+  augment "/rt:routing/rt:control-plane-protocols/rt:control-plane-protocol/"
+        + "ospf:ospf/ospf:areas/ospf:area/ospf:interfaces/ospf:interface/"
+        + "ospf:neighbors/ospf:neighbor" {
+    when "derived-from-or-self(../../../../../../../rt:type, 'infix-routing:ospfv2')" {
+      description
+        "This augmentation is only valid for OSPFv2.";
+    }
+    description
+      "Infix extension to add uptime information to OSPF neighbors.";
+
+    leaf uptime {
+      type uint32;
+      units "seconds";
+      config false;
+      description
+        "Time since the neighbor transitioned to the Full state.
+         Reported in seconds for consistency with other timers.";
+    }
+
+    leaf role {
+      type enumeration {
+        enum DR {
+          description "Designated Router";
+        }
+        enum BDR {
+          description "Backup Designated Router";
+        }
+        enum DROther {
+          description "Neither DR nor BDR";
+        }
+      }
+      config false;
+      description
+        "OSPF neighbor's role on the network segment (DR, BDR, or DROther).
+         This is derived from the neighbor's priority and router ID during
+         the DR/BDR election process.";
+    }
+
+    leaf interface-name {
+      type string;
+      config false;
+      description
+        "Interface name with local address in format 'interface:address'.
+         Example: 'e5:10.0.23.1' indicates interface e5 with local address 10.0.23.1.
+         This is useful for networks where multiple addresses exist on an interface.";
+    }
+  }
 }

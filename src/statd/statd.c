@@ -7,6 +7,9 @@
 #include <ev.h>
 #include <string.h>
 #include <errno.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <pthread.h>
 
 #include <asm/types.h>
 #include <sys/socket.h>
@@ -26,6 +29,8 @@
 #include <srx/systemv.h>
 
 #include "shared.h"
+#include "journal.h"
+#include "avahi.h"
 
 /* New kernel feature, not in sys/mman.h yet */
 #ifndef MFD_NOEXEC_SEAL
@@ -40,9 +45,14 @@
 #define XPATH_HARDWARE_BASE "/ietf-hardware:hardware"
 #define XPATH_SYSTEM_BASE "/ietf-system"
 #define XPATH_ROUTING_OSPF XPATH_ROUTING_BASE "/ospf"
+#define XPATH_ROUTING_RIP XPATH_ROUTING_BASE "/rip"
+#define XPATH_ROUTING_BFD XPATH_ROUTING_BASE "/bfd"
 #define XPATH_CONTAIN_BASE  "/infix-containers:containers"
 #define XPATH_DHCP_SERVER_BASE  "/infix-dhcp-server:dhcp-server"
 #define XPATH_LLDP_BASE "/ieee802-dot1ab-lldp:lldp"
+#define XPATH_FIREWALL_BASE "/infix-firewall:firewall"
+#define XPATH_NTP_BASE "/ietf-ntp:ntp"
+#define XPATH_PTP_BASE "/ieee1588-ptp-tt:ptp"
 
 TAILQ_HEAD(sub_head, sub);
 
@@ -56,8 +66,12 @@ struct sub {
 
 struct statd {
 	struct sub_head subs;
-	sr_session_ctx_t *sr_ses;
+	sr_session_ctx_t *sr_ses;        /* Provider session with callbacks */
+	sr_session_ctx_t *sr_query_ses;  /* Consumer session for queries */
+	sr_conn_ctx_t *sr_conn;          /* Connection (owns YANG context) */
 	struct ev_loop *ev_loop;
+	struct journal_ctx journal;      /* Journal thread context */
+	struct mdns_ctx mdns;            /* mDNS neighbor monitor */
 };
 
 static int ly_add_yanger_data(const struct ly_ctx *ctx, struct lyd_node **parent,
@@ -85,7 +99,6 @@ static int ly_add_yanger_data(const struct ly_ctx *ctx, struct lyd_node **parent
 	if (err) {
 		ERROR("Error, running yanger");
 		fclose(stream);
-		close(fd);
 		return SR_ERR_SYS;
 	}
 
@@ -94,16 +107,15 @@ static int ly_add_yanger_data(const struct ly_ctx *ctx, struct lyd_node **parent
 	if (lseek(fd, 0, SEEK_SET) == (off_t)-1) {
 		ERROR("Error, unable reset stream (seek)");
 		fclose(stream);
-		close(fd);
 		return SR_ERR_SYS;
 	}
 
 	err = lyd_parse_data_fd(ctx, fd, LYD_JSON, LYD_PARSE_ONLY, 0, parent);
 	if (err)
-		ERROR("Error, parsing yanger data (%d)", err);
+		ERROR("Error, parsing yanger data (%d): %s", err, ly_errmsg(ctx));
 
 	fclose(stream);
-	close(fd);
+	/* Note: fclose() already closes the underlying fd from fdopen() */
 
 	return err;
 }
@@ -258,6 +270,78 @@ static int sr_ospf_cb(sr_session_ctx_t *session, uint32_t, const char *,
 	return err;
 }
 
+static int sr_rip_cb(sr_session_ctx_t *session, uint32_t, const char *,
+		     const char *, const char *xpath, uint32_t,
+		     struct lyd_node **parent, __attribute__((unused)) void *priv)
+{
+	char *yanger_args[5] = {
+		YANGER_BINPATH,
+		"ietf-rip",
+		NULL
+	};
+	const struct ly_ctx *ctx;
+	sr_conn_ctx_t *con;
+	sr_error_t err;
+
+	DEBUG("Incoming rip query for xpath: %s", xpath);
+
+	con = sr_session_get_connection(session);
+	if (!con) {
+		ERROR("Error, getting sr connection");
+		return SR_ERR_INTERNAL;
+	}
+
+	ctx = sr_acquire_context(con);
+	if (!ctx) {
+		ERROR("Error, acquiring context");
+		return SR_ERR_INTERNAL;
+	}
+
+	err = ly_add_yanger_data(ctx, parent, yanger_args);
+	if (err)
+		ERROR("Error adding yanger data");
+
+	sr_release_context(con);
+
+	return err;
+}
+
+static int sr_bfd_cb(sr_session_ctx_t *session, uint32_t, const char *,
+		     const char *, const char *xpath, uint32_t,
+		     struct lyd_node **parent, __attribute__((unused)) void *priv)
+{
+	char *yanger_args[5] = {
+		YANGER_BINPATH,
+		"ietf-bfd-ip-sh",
+		NULL
+	};
+	const struct ly_ctx *ctx;
+	sr_conn_ctx_t *con;
+	sr_error_t err;
+
+	DEBUG("Incoming BFD query for xpath: %s", xpath);
+
+	con = sr_session_get_connection(session);
+	if (!con) {
+		ERROR("Error, getting sr connection");
+		return SR_ERR_INTERNAL;
+	}
+
+	ctx = sr_acquire_context(con);
+	if (!ctx) {
+		ERROR("Error, acquiring context");
+		return SR_ERR_INTERNAL;
+	}
+
+	err = ly_add_yanger_data(ctx, parent, yanger_args);
+	if (err)
+		ERROR("Error adding yanger data");
+
+	sr_release_context(con);
+
+	return err;
+}
+
 
 static void sigint_cb(struct ev_loop *loop, struct ev_signal *, int)
 {
@@ -268,6 +352,14 @@ static void sigusr1_cb(struct ev_loop *, struct ev_signal *, int)
 {
 	debug ^= 1;
 }
+
+static void sighup_cb(struct ev_loop *, struct ev_signal *w, int)
+{
+	struct statd *statd = w->data;
+
+	mdns_ctx_reconnect(&statd->mdns);
+}
+
 
 static void sr_event_cb(struct ev_loop *, struct ev_io *w, int)
 {
@@ -342,6 +434,10 @@ static int subscribe_to_all(struct statd *statd)
 		return SR_ERR_INTERNAL;
 	if (subscribe(statd, "ietf-routing", XPATH_ROUTING_OSPF, sr_ospf_cb))
 		return SR_ERR_INTERNAL;
+	if (subscribe(statd, "ietf-routing", XPATH_ROUTING_RIP, sr_rip_cb))
+		return SR_ERR_INTERNAL;
+	if (subscribe(statd, "ietf-routing", XPATH_ROUTING_BFD, sr_bfd_cb))
+		return SR_ERR_INTERNAL;
 	if (subscribe(statd, "ietf-hardware", XPATH_HARDWARE_BASE, sr_generic_cb))
 		return SR_ERR_INTERNAL;
 	if (subscribe(statd, "ietf-system", XPATH_SYSTEM_BASE":system", sr_generic_cb))
@@ -356,6 +452,12 @@ static int subscribe_to_all(struct statd *statd)
 #endif
 	if (subscribe(statd, "infix-dhcp-server", XPATH_DHCP_SERVER_BASE, sr_generic_cb))
 		return SR_ERR_INTERNAL;
+	if (subscribe(statd, "infix-firewall", XPATH_FIREWALL_BASE, sr_generic_cb))
+		return SR_ERR_INTERNAL;
+	if (subscribe(statd, "ietf-ntp", XPATH_NTP_BASE, sr_generic_cb))
+		return SR_ERR_INTERNAL;
+	if (subscribe(statd, "ieee1588-ptp-tt", XPATH_PTP_BASE, sr_generic_cb))
+		return SR_ERR_INTERNAL;
 
 	INFO("Successfully subscribed to all models");
 	return SR_ERR_OK;
@@ -363,10 +465,9 @@ static int subscribe_to_all(struct statd *statd)
 
 int main(int argc, char *argv[])
 {
-	struct ev_signal sigint_watcher, sigusr1_watcher;
+	struct ev_signal sigint_watcher, sigusr1_watcher, sighup_watcher;
 	int log_opts = LOG_PID | LOG_NDELAY;
 	struct statd statd = {};
-	sr_conn_ctx_t *sr_conn;
 	const char *env;
 	int err;
 
@@ -383,24 +484,37 @@ int main(int argc, char *argv[])
 
 	INFO("Status daemon starting");
 
-	err = sr_connect(SR_CONN_DEFAULT, &sr_conn);
+	err = sr_connect(SR_CONN_DEFAULT, &statd.sr_conn);
 	if (err) {
 		ERROR("Error, connecting to sysrepo: %s", sr_strerror(err));
 		return EXIT_FAILURE;
 	}
 	DEBUG("Connected to sysrepo");
 
-	err = sr_session_start(sr_conn, SR_DS_OPERATIONAL, &statd.sr_ses);
+	/* Session 1: Provider with operational callbacks */
+	err = sr_session_start(statd.sr_conn, SR_DS_OPERATIONAL, &statd.sr_ses);
 	if (err) {
-		ERROR("Error, start sysrepo session: %s", sr_strerror(err));
-		sr_disconnect(sr_conn);
+		ERROR("Error, start provider session: %s", sr_strerror(err));
+		sr_disconnect(statd.sr_conn);
 		return EXIT_FAILURE;
 	}
-	DEBUG("Session started (%p)", statd.sr_ses);
+	DEBUG("Provider session started (%p)", statd.sr_ses);
+
+	/* Session 2: Consumer for querying operational data */
+	err = sr_session_start(statd.sr_conn, SR_DS_OPERATIONAL, &statd.sr_query_ses);
+	if (err) {
+		ERROR("Error, start query session: %s", sr_strerror(err));
+		sr_session_stop(statd.sr_ses);
+		sr_disconnect(statd.sr_conn);
+		return EXIT_FAILURE;
+	}
+	DEBUG("Query session started (%p)", statd.sr_query_ses);
 
 	err = subscribe_to_all(&statd);
 	if (err) {
-		sr_disconnect(sr_conn);
+		sr_session_stop(statd.sr_query_ses);
+		sr_session_stop(statd.sr_ses);
+		sr_disconnect(statd.sr_conn);
 		return EXIT_FAILURE;
 	}
 
@@ -412,6 +526,21 @@ int main(int argc, char *argv[])
 	sigusr1_watcher.data = &statd;
 	ev_signal_start(statd.ev_loop, &sigusr1_watcher);
 
+	ev_signal_init(&sighup_watcher, sighup_cb, SIGHUP);
+	sighup_watcher.data = &statd;
+	ev_signal_start(statd.ev_loop, &sighup_watcher);
+
+	err = journal_start(&statd.journal, statd.sr_query_ses);
+	if (err) {
+		sr_session_stop(statd.sr_query_ses);
+		sr_session_stop(statd.sr_ses);
+		sr_disconnect(statd.sr_conn);
+		return EXIT_FAILURE;
+	}
+
+	if (mdns_ctx_init(&statd.mdns, statd.ev_loop, statd.sr_conn))
+		INFO("mDNS neighbor monitoring not available");
+
 	/* Signal readiness to Finit */
 	pidfile(NULL);
 
@@ -420,9 +549,14 @@ int main(int argc, char *argv[])
 
 	/* We should never get here during normal operation */
 	INFO("Status daemon shutting down");
+
+	mdns_ctx_exit(&statd.mdns);
+	journal_stop(&statd.journal);
+
 	unsub_to_all(&statd);
+	sr_session_stop(statd.sr_query_ses);
 	sr_session_stop(statd.sr_ses);
-	sr_disconnect(sr_conn);
+	sr_disconnect(statd.sr_conn);
 
 	return EXIT_SUCCESS;
 }

@@ -1,1 +1,0 @@
-bridge_fwd_sgl_dut.adoc

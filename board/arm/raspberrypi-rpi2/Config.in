@@ -1,0 +1,11 @@
+config BR2_PACKAGE_RASPBERRYPI_RPI2
+	bool "Raspberry Pi 2 Model B (32-bit ARMv7)"
+	depends on BR2_arm
+	select SDCARD_AUX
+	help
+	  Support for the 32-bit ARMv7 Raspberry Pi 2B single-board computer
+	  (SBC) with BCM2836 quad-core Cortex-A7 processor.
+
+	  This was the only Raspberry Pi model with the BCM2836 and the rare
+	  RPi 2B board revision v1.2 actually got an underclocked BCM2837,
+	  which is the saem Cortex-A53 as the RPi3, but w/o wifi.

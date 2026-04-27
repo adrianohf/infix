@@ -10,7 +10,7 @@
 #include <srx/lyx.h>
 #include <srx/srx_val.h>
 
-#include "ietf-interfaces.h"
+#include "interfaces.h"
 
 static bool iface_uses_autoneg(struct lyd_node *cif)
 {
@@ -38,13 +38,21 @@ static int netdag_gen_ethtool_flow_control(struct dagger *net, struct lyd_node *
 	enum netdag_init phase = NETDAG_INIT_PHYS;
 	FILE *fp;
 
+	/* Skip flow control configuration for NICs with broken support */
+	if (iface_has_quirk(ifname, "broken-flow-control"))
+		return 0;
+
 	if (iface_has_quirk(ifname, "phy-detached-when-down"))
 		phase = NETDAG_INIT_POST;
 
 	fp = dagger_fopen_net_init(net, ifname, phase, "ethtool-flow-control.sh");
 	if (!fp)
 		return -EIO;
+
+	/* Check if the NIC supports pause frames at all */
 	fprintf(fp, "[[ -n $(ethtool --json %s | jq '.[] | select(.\"supported-pause-frame-use\" == \"No\")') ]] && exit 0\n", ifname);
+
+	/* Disable flow control */
 	fprintf(fp, "ethtool --pause %s autoneg %s rx off tx off\n",
 		ifname, iface_uses_autoneg(cif) ? "on" : "off");
 	fclose(fp);
@@ -60,6 +68,9 @@ static int netdag_gen_ethtool_autoneg(struct dagger *net, struct lyd_node *cif)
 	const char *speed, *duplex;
 	int mbps, err = 0;
 	FILE *fp;
+
+	if (iface_has_quirk(ifname, "broken-autoneg"))
+		return SR_ERR_OK;
 
 	if (iface_has_quirk(ifname, "phy-detached-when-down"))
 		phase = NETDAG_INIT_POST;
@@ -113,23 +124,6 @@ int netdag_gen_ethtool(struct dagger *net, struct lyd_node *cif, struct lyd_node
 {
 	struct lyd_node *eth = lydx_get_child(dif, "ethernet");
 	int err;
-
-	/*
-	 * Story time: when assigning a physical interface to a container, and then
-	 *             removing it, even though our type may be 'etherlike' we will
-	 *             get the following from sysrepo:
-	 *
-	 *               "ieee802-ethernet-interface:ethernet": {
-	 *                 "@": {
-	 *                   "yang:operation": "delete"
-	 *                 },
-	 *                 "duplex": "full"
-	 *               },
-	 *
-	 *             Hence this "redundant" check.
-	 */
-	if (iftype_from_iface(cif) != IFT_ETH)
-		return 0;
 
 	if (!eth)
 		return 0;

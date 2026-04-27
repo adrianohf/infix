@@ -6,7 +6,7 @@
 
 #include "core.h"
 #include "cni.h"
-#include "ietf-interfaces.h"
+#include "interfaces.h"
 
 #define CNI_NAME "/etc/cni/net.d/%s.conflist"
 
@@ -250,12 +250,15 @@ static int cni_bridge(struct lyd_node *net, const char *ifname)
 		"    },\n"	/* /bridge */
 		"    {\n"
 		"      \"type\": \"portmap\",\n"
+		"      \"backend\": \"iptables\",\n"
+		"      \"snat\": true,\n"
 		"      \"capabilities\": {\n"
 		"        \"portMappings\": true\n"
 		"      }\n"
 		"    },\n"	/* /portmap */
 		"    {\n"
-		"      \"type\": \"firewall\"\n"
+		"      \"type\": \"firewall\",\n"
+		"      \"backend\": \"iptables\"\n"
 		"    },\n"	/* /firewall */
 		"    {\n"
 		"      \"type\": \"tuning\"\n"
