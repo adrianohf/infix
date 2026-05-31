@@ -7,13 +7,13 @@
       
       
       
-        <link rel="canonical" href="https://kernelkit.github.io/infix/dev/hardware/">
+        <link rel="canonical" href="https://kernelkit.github.io/infix/dev/vlan/">
       
       
-        <link rel="prev" href="../nacm/">
+        <link rel="prev" href="../ethernet/">
       
       
-        <link rel="next" href="../management/">
+        <link rel="next" href="../ip/">
       
       
         
@@ -24,7 +24,7 @@
     
     
       
-        <title>Hardware Info &amp; Status - User's Guide</title>
+        <title>VLAN Interfaces - User's Guide</title>
       
     
     
@@ -82,7 +82,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#hardware-information-and-status" class="md-skip">
+        <a href="#vlan-interfaces" class="md-skip">
           Skip to content
         </a>
       
@@ -121,7 +121,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Hardware Info &amp; Status
+              VLAN Interfaces
             
           </span>
         </div>
@@ -618,8 +618,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -655,11 +657,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4">
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked="">
         
           
           <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
@@ -680,7 +682,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -835,10 +837,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../vlan/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VLAN Interfaces
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -854,6 +883,59 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
+      
+        <li class="md-nav__item">
+  <a href="#on-top-of-an-ethernet-interface" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On Top of an Ethernet Interface
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#on-top-of-a-bridge" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        On Top of a Bridge
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#stacked-q-in-q" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stacked (Q-in-Q)
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1359,10 +1441,8 @@
       
   
   
-    
   
   
-  
     
     
       
@@ -1388,11 +1468,11 @@
     
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked="">
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6">
         
           
           <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
@@ -1413,7 +1493,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
@@ -1512,37 +1592,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Hardware Info &amp; Status
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../hardware/" class="md-nav__link">
         
   
   
@@ -1558,115 +1611,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
-      
-        <li class="md-nav__item">
-  <a href="#gpsgnss-receivers" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        GPS/GNSS Receivers
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="GPS/GNSS Receivers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current status
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-gps-receiver" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configure GPS receiver
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#usb-ports" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        USB Ports
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="USB Ports">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-status_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current status
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-usb-port" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configure USB port
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-a-usb-stick" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using a USB Stick
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -2375,91 +2319,35 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix="">
       
         <li class="md-nav__item">
-  <a href="#gpsgnss-receivers" class="md-nav__link">
+  <a href="#on-top-of-an-ethernet-interface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        GPS/GNSS Receivers
+        On Top of an Ethernet Interface
       
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="GPS/GNSS Receivers">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-status" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current status
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-gps-receiver" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Configure GPS receiver
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#usb-ports" class="md-nav__link">
+  <a href="#on-top-of-a-bridge" class="md-nav__link">
     <span class="md-ellipsis">
       
-        USB Ports
-      
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="USB Ports">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#current-status_1" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Current status
+        On Top of a Bridge
       
     </span>
   </a>
   
 </li>
-        
-          <li class="md-nav__item">
-  <a href="#configure-usb-port" class="md-nav__link">
+      
+        <li class="md-nav__item">
+  <a href="#stacked-q-in-q" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Configure USB port
+        Stacked (Q-in-Q)
       
     </span>
   </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#using-a-usb-stick" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Using a USB Stick
-      
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -2506,10 +2394,10 @@
     
     
       <li class="md-path__item">
-        <a href="../boot/" class="md-path__link">
+        <a href="../networking/" class="md-path__link">
           
   <span class="md-ellipsis">
-    System
+    Networking
   </span>
 
         </a>
@@ -2531,155 +2419,82 @@
   
 
 
-<h1 id="hardware-information-and-status">Hardware Information and Status<a class="headerlink" href="#hardware-information-and-status" title="Permanent link">¶</a></h1>
-<p>The hardware infomation and status is handled by the YANG model <a href="https://www.rfc-editor.org/rfc/rfc8348.html">IETF
-hardware</a>, with deviations and augmentations in <em>infix-hardware</em>.</p>
-<h2 id="gpsgnss-receivers">GPS/GNSS Receivers<a class="headerlink" href="#gpsgnss-receivers" title="Permanent link">¶</a></h2>
-<p>Infix supports GPS/GNSS receivers for hardware status monitoring and NTP
-time synchronization.  USB GPS receivers using the USB ACM interface are
-supported (e.g., u-blox).  When connected, devices are automatically
-discovered and named <code>gps0</code>, <code>gps1</code>, etc.</p>
-<h3 id="current-status">Current status<a class="headerlink" href="#current-status" title="Permanent link">¶</a></h3>
-<pre class="cli"><code>admin@example:/&gt; <b>show hardware</b>
-<span class="header">HARDWARE COMPONENTS                                           </span>
-──────────────────────────────────────────────────────────────
-<span class="title">GPS/GNSS Receivers                                           </span>
-Name                : gps0
-Device              : /dev/gps0
-Driver              : u-blox
-Status              : Active
-Fix                 : 3D
-Satellites          : 10/15 (used/visible)
-Position            : 59.334567N 18.063456E 42.3m
-PPS                 : Available
-</code></pre>
-
-<p>Available information per receiver:</p>
-<table>
-<thead>
-<tr>
-<th>Field</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Name</td>
-<td>Component name (<code>gps0</code>, <code>gps1</code>, ...)</td>
-</tr>
-<tr>
-<td>Device</td>
-<td>Device path (<code>/dev/gps0</code>)</td>
-</tr>
-<tr>
-<td>Driver</td>
-<td>Protocol driver (e.g., <code>u-blox</code>, <code>NMEA</code>, <code>SiRF</code>)</td>
-</tr>
-<tr>
-<td>Status</td>
-<td><code>Active</code> or <code>Inactive</code></td>
-</tr>
-<tr>
-<td>Fix</td>
-<td><code>NONE</code>, <code>2D</code>, or <code>3D</code></td>
-</tr>
-<tr>
-<td>Satellites</td>
-<td>Used/visible count</td>
-</tr>
-<tr>
-<td>Position</td>
-<td>Latitude, longitude, altitude (when fix acquired)</td>
-</tr>
-<tr>
-<td>PPS</td>
-<td>Pulse Per Second signal availability</td>
-</tr>
-</tbody>
-</table>
-<h3 id="configure-gps-receiver">Configure GPS receiver<a class="headerlink" href="#configure-gps-receiver" title="Permanent link">¶</a></h3>
-<p>GPS receivers are hardware components with class <code>gps</code>.  The class is
-auto-inferred from the component name, similar to WiFi radios (<code>radioN</code>):</p>
+<h1 id="vlan-interfaces">VLAN Interfaces<a class="headerlink" href="#vlan-interfaces" title="Permanent link">¶</a></h1>
+<p>A VLAN interface is an interface stacked on top of another Linux interface
+that filters traffic for a single 802.1Q VID.  <code>tcpdump</code> on a VLAN interface
+shows only frames matching that VID, compared to <em>all</em> VIDs when listening
+on the lower-layer interface.</p>
+<p><a class="glightbox" data-type="image" data-width="100%" data-height="auto" href="../img/interface-vlan-variants.svg" data-desc-position="bottom"><img alt="VLAN interface on top of Ethernet or Bridge interfaces" src="../img/interface-vlan-variants.svg"></a></p>
+<p>This page covers VLAN interfaces stacked on Ethernet, on a VLAN-filtering
+bridge, and on other VLAN interfaces.  For VLAN handling <em>inside</em> a bridge
+(port VIDs, tagged/untagged membership, pvid), see <a href="../bridging/#vlan-filtering-bridge">VLAN Filtering
+Bridge</a>.</p>
+<h2 id="on-top-of-an-ethernet-interface">On Top of an Ethernet Interface<a class="headerlink" href="#on-top-of-an-ethernet-interface" title="Permanent link">¶</a></h2>
+<p>A VLAN interface for VID 20 on top of an Ethernet interface <code>eth0</code> is by
+convention named <code>eth0.20</code>.</p>
 <pre class="cli"><code>admin@example:/&gt; <b>configure</b>
-admin@example:/config/&gt; <b>set hardware component gps0</b>
-admin@example:/config/&gt; <b>leave</b>
+admin@example:/config/&gt; <b>edit interface eth0.20</b>
+admin@example:/config/interface/eth0.20/&gt; <b>show</b>
+type vlan;
+vlan {
+  tag-type c-vlan;
+  id 20;
+  lower-layer-if eth0;
+}
+admin@example:/config/interface/eth0.20/&gt; <b>leave</b>
 </code></pre>
 
-<p>To use a GPS receiver as an NTP reference clock source, see
-<a href="../ntp/#gps-reference-clock">NTP — GPS Reference Clock</a>.</p>
-<h2 id="usb-ports">USB Ports<a class="headerlink" href="#usb-ports" title="Permanent link">¶</a></h2>
-<p>For Infix to be able to control USB port(s), a device tree modification
-is needed (see <em>alder.dtsi</em> for full example).</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="w"> </span><span class="err">chose</span><span class="kc">n</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">   </span><span class="err">i</span><span class="kc">nf</span><span class="err">ix</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">     </span><span class="err">usb</span><span class="mi">-</span><span class="err">por</span><span class="kc">ts</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="err">&lt;&amp;cp</span><span class="mi">0</span><span class="err">_usb</span><span class="mi">3</span><span class="err">_</span><span class="mi">1</span><span class="err">&gt;;</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">     </span><span class="err">usb</span><span class="mi">-</span><span class="err">por</span><span class="kc">t</span><span class="mi">-</span><span class="kc">na</span><span class="err">mes</span><span class="w"> </span><span class="err">=</span><span class="w"> </span><span class="s2">"USB"</span><span class="err">;</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">   </span><span class="p">}</span><span class="err">;</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w"> </span><span class="p">}</span><span class="err">;</span>
-</code></pre></div>
-<p>Two USB ports are also exposed in QEMU for test purpose.</p>
-<p>All USB ports in the system will be disabled during boot due to the file
-<code>board/common/rootfs/etc/modprobe.d/usbcore.conf</code>.  If you do not want
-Infix to control USB port(s), remove the file or manually enable the USB
-bus, here is an example:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Enable the bus</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="nb">echo</span><span class="w"> </span><span class="m">1</span><span class="w"> </span>&gt;<span class="w"> </span>/sys/bus/usb/devices/usb1/authorized
-</code></pre></div>
-<p>And then enable sub-devices (e.g. USB memory)</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Enable a device plugged into usb1</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="nb">echo</span><span class="w"> </span><span class="m">1</span><span class="w"> </span>&gt;<span class="w">  </span>/sys/bus/usb/devices/usb1/1-1/authorized
-</code></pre></div>
-<h3 id="current-status_1">Current status<a class="headerlink" href="#current-status_1" title="Permanent link">¶</a></h3>
-<pre class="cli"><code>admin@example:/&gt; <b>show hardware</b>
-<span class="header">HARDWARE COMPONENTS                                           </span>
-──────────────────────────────────────────────────────────────
-<span class="title">Board Information                                            </span>
-Model               : FriendlyElec NanoPi R2S
-Manufacturer        : FriendlyElec
-Serial Number       : 9d1fbfdab6d171ce
-Base MAC Address    : 4a:dc:d8:20:0d:85
-──────────────────────────────────────────────────────────────
-<span class="title">USB Ports                                                    </span>
-<span class="header">NAME                                         STATE     OPER   </span>
-USB                                          unlocked  enabled
-──────────────────────────────────────────────────────────────
-<span class="title">Sensors                                                      </span>
-<span class="header">NAME                          VALUE                 STATUS    </span>
-soc                           44.1 °C               ok        
-soc                           44.5 °C               ok        
-</code></pre>
-
-<p>An USB port can be in two states <em>unlocked</em> and <em>locked</em>. When a port is
-locked, all connected devices will get power, but never authorized by
-Linux to use.</p>
-<h3 id="configure-usb-port">Configure USB port<a class="headerlink" href="#configure-usb-port" title="Permanent link">¶</a></h3>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>You can only configure USB ports known to the system.  See the CLI
-command <code>show hardware</code> in admin-exec context.  (Use <code>do</code> prefix in
-configure context.)</p>
+<p>The <code>tag-type</code> defaults to <code>c-vlan</code> (802.1Q customer VLAN, EtherType 0x8100).
+Set to <code>s-vlan</code> (802.1ad service VLAN, EtherType 0x88A8) to terminate an outer
+S-Tag.</p>
+<div class="admonition tip">
+<p class="admonition-title">Tip</p>
+<p>If you name your VLAN interface <code>foo0.N</code> or <code>vlanN</code>, where <code>N</code> is a
+number, the CLI infers the interface type automatically.  Otherwise
+the type must be set explicitly.</p>
 </div>
+<h2 id="on-top-of-a-bridge">On Top of a Bridge<a class="headerlink" href="#on-top-of-a-bridge" title="Permanent link">¶</a></h2>
+<p>When the lower-layer interface is a VLAN-filtering bridge, the VLAN interface
+gives the CPU an IP-addressable endpoint inside the bridged broadcast domain
+for that VID.  This pattern is named <code>vlanN</code> by convention.</p>
 <pre class="cli"><code>admin@example:/&gt; <b>configure</b>
-admin@example:/config/&gt; <b>set hardware component USB state admin-state unlocked</b>
-admin@example:/config/&gt; <b>leave</b>
-admin@example:/&gt;
+admin@example:/config/&gt; <b>edit interface vlan10</b>
+admin@example:/config/interface/vlan10/&gt; <b>set vlan id 10</b>
+admin@example:/config/interface/vlan10/&gt; <b>set vlan lower-layer-if br0</b>
+admin@example:/config/interface/vlan10/&gt; <b>leave</b>
 </code></pre>
 
-<h3 id="using-a-usb-stick">Using a USB Stick<a class="headerlink" href="#using-a-usb-stick" title="Permanent link">¶</a></h3>
-<p>With the USB port unlocked, a memory stick can be used to expand the
-storage of the device.  Plug it in, either directly, or via a USB hub.
-All partitions of <em>VFAT</em> or <em>exFAT</em> type are automatically mounted to
-the <code>/media/&lt;LABLEL&gt;</code> directory, e.g., <code>/media/memorystick</code>, or if a
-partition does not have a label, using the kernel device name, e.g.,
-<code>/media/sda</code>.</p>
-<p>Depending on the partition type the the media is either mounted in
-<code>flush</code> or <code>sync</code> mode to ensure files are properly flushed to the
-backing store of the memory stick.  This to protect against users
-yanking out a device before file(s) have been written to it.</p>
-<p>The only way currently to safely "eject" a USB memory stick is to use
-<code>umount</code> command from a UNIX shell, which explicitly synchronizes any
-cached data to disk before returning the prompt:</p>
-<pre class="cli"><code>admin@example:~$ <b>sudo umount /media/log</b>
+<p>The bridge <code>br0</code> must have VLAN 10 configured with the bridge itself as a
+tagged member.  See <a href="../bridging/#vlan-filtering-bridge">VLAN Filtering Bridge</a>
+for the bridge-side configuration.</p>
+<h2 id="stacked-q-in-q">Stacked (Q-in-Q)<a class="headerlink" href="#stacked-q-in-q" title="Permanent link">¶</a></h2>
+<p>VLAN interfaces can be stacked.  A VLAN interface whose lower-layer is itself
+a VLAN interface terminates the inner tag, leaving the outer tag for the
+parent to handle.</p>
+<pre class="cli"><code>admin@example:/&gt; <b>configure</b>
+admin@example:/config/&gt; <b>edit interface eth0.10</b>
+admin@example:/config/interface/eth0.10/&gt; <b>set vlan tag-type s-vlan</b>
+admin@example:/config/interface/eth0.10/&gt; <b>leave</b>
+admin@example:/config/&gt; <b>edit interface eth0.10.20</b>
+admin@example:/config/interface/eth0.10.20/&gt; <b>show</b>
+type vlan;
+vlan {
+  tag-type c-vlan;
+  id 20;
+  lower-layer-if eth0.10;
+}
+admin@example:/config/interface/eth0.10.20/&gt; <b>leave</b>
+</code></pre>
+
+<p>The summary view shows each VLAN row pointing at its immediate parent:</p>
+<pre class="cli"><code>admin@example:/&gt; <b>show interface</b>
+<span class="header">INTERFACE       PROTOCOL      STATE       DATA                  </span>
+eth0.10         vlan          UP          vid: 10
+│               ipv4                      10.0.10.1/24 (static)
+└ eth0
+eth0.10.20      vlan          UP          vid: 20
+│               ipv4                      10.0.10.20/28 (static)
+└ eth0.10
 </code></pre>
 
 

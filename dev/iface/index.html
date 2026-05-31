@@ -42,12 +42,6 @@
     
     
       
-        
-        
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
-        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
-      
     
     
       <link rel="stylesheet" href="../extra.css">
@@ -657,6 +651,8 @@
       
         
       
+        
+      
     
     
     
@@ -1013,6 +1009,34 @@
   
   
     <li class="md-nav__item">
+      <a href="../vlan/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    VLAN Interfaces
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
       <a href="../ip/" class="md-nav__link">
         
   
@@ -1195,10 +1219,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_12">
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_13">
         
           
-          <label class="md-nav__link" for="__nav_4_12" id="__nav_4_12_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4_13" id="__nav_4_13_label" tabindex="0">
             
   
   
@@ -1216,8 +1240,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_12_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4_12">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_4_13_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4_13">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2624,13 +2648,18 @@ admin@example:/config/interface/eth0/&gt; <b>leave</b>
 
 <p>The operational status can be inspected to see both administrative and
 actual link state:</p>
-<pre class="cli"><code>admin@example:/&gt; <b>show interfaces</b>
-INTERFACE       PROTOCOL   STATE       DATA
-eth0            ethernet   <b>DISABLED</b>    02:00:00:00:00:00
-eth1            ethernet   UP          02:00:00:00:00:01
+<pre class="cli"><code>admin@example:/&gt; <b>show interface</b>
+<span class="header">INTERFACE       PROTOCOL      STATE       DATA             </span>
+eth0            ethernet      <b>DISABLED</b>    02:00:00:00:00:00
+eth1            1000baseT     UP          duplex: full
+                ethernet                  02:00:00:00:00:01
 ...
 </code></pre>
 
+<p>The rows are layered bottom-up by protocol: a physical-medium row (only
+emitted when the link is up) on top, then the ethernet row carrying the
+bare MAC, then any ipv4/ipv6 sub-rows.  See <a href="../ethernet/">Ethernet</a> for the
+full set of summary fields.</p>
 <h2 id="description">Description<a class="headerlink" href="#description" title="Permanent link">¶</a></h2>
 <p>The <code>description</code> is a free-form text string (max 64 characters) saved
 as the Linux interface alias (<code>ifalias</code>).  Use it to document an interface's
@@ -2643,9 +2672,9 @@ admin@example:/config/interface/eth0/&gt; <b>leave</b>
 <p>The description is visible in the operational datastore and in <code>show</code>
 commands:</p>
 <pre class="cli"><code>admin@example:/&gt; <b>show interface eth0</b>
-name                : eth0
-description         : Uplink to core switch
-index               : 2
+name               : eth0
+description        : Uplink to core switch
+index              : 2
 ...
 </code></pre>
 
@@ -2765,7 +2794,7 @@ connected routes (or add <code>lo0</code> as an OSPF interface):</p>
       <div class="md-copyright">
   
     <div class="md-copyright__highlight">
-      Copyright © 2022-2025 The KernelKit Team
+      Copyright © 2022-2026 The KernelKit Team
     </div>
   
   
