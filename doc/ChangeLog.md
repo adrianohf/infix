@@ -3,28 +3,65 @@ Change Log
 
 All notable changes to the project are documented in this file.
 
-[v26.05.0][UNRELEASED]
+[v26.05.0][] - 2026-05-29
 -------------------------
 
 ### Changes
 
 - Upgrade Linux kernel to 6.18.33 (LTS)
+- Upgrade Buildroot to 2025.02.14 (LTS)
 - Upgrade FRR to 10.5.4
-- Add support for [Acer Connect Vero W6m][AcerConnectVero], a COTS home router,
-  based upon the same hardware as [Banana Pi BPI-R3][BPI-R3], but
+- Add support for [Acer Connect Vero W6m][AcerConnectVero], a low-cost COTS
+  home router, based on the same hardware as [Banana Pi BPI-R3][BPI-R3], but
   with a Wi-Fi 6E (6 GHz band) chip.
 - Add configurable channel-width in Wi-Fi configuration.
+- Upgrade `ieee802-ethernet-interface` YANG model to revision 2025-09-10 (IEEE
+  Std 802.3.2-2025), adding the standard `phy-type` and `pmd-type` operational
+  leaves.  Speed is now exposed via `ietf-interfaces:speed` (bps, RFC 8343);
+  the now obsolete `eth:speed` is no longer returned
+- Rework `show interface` summary output as layered protocol rows.  When a
+  port has link, a physical-medium row (e.g. `1000baseT`, `10GbaseLR`) appears
+  above the `ethernet` row.  VLAN, GRE, VXLAN and WiFi interfaces likewise get
+  one row per protocol layer, with type-specific data on each (`vid:`,
+  `remote:`, `vni:`, `station ssid:`, etc.), issue #530
+- Add support for configurable auto-negotiation for Ethernet ports.  A new
+  `advertised-pmd-types` leaf-list replaces the fixed speed idiom for pinned
+  link modes, issue #805.  See the [Ethernet Interfaces][ethernet] section in
+  the User Guide for details. Existing configurations using fixed speed are
+  migrated automatically on upgrade
+- Add support for configurable MDI/MDI-X pinout on Ethernet ports.  Needed on
+  some PHYs where Auto-MDIX stops working once auto-negotiation is disabled
+- New operational `supported-pmd-types` leaf-list on each Ethernet interface,
+  exposing the set of PMD types currently supported
+- New CLI command `show operational`, and optional XPath filtering for this
+  and any of the other datastores, using `[path /path/to/subtree]`
+- CLI `show` commands now surface human-friendly error messages instead of a
+  raw Python exceptions, e.g., `Interface "w" not found`
 
 ### Fixes
 
-- Fix #1493: container with a physical interface not properly removed
-  when switching to a configuration without containers
-- Handle unclean daemon exits better, e.g., `dbus-daemon` crashing and
-  leaving a stale pidfile behind, causing it to refuse to be restarted
+- Fix #1493: container with a physical interface not properly removed when
+  switching to a configuration without containers
+- Fix #1506: add documentation on how to configure VLAN interfaces, including
+  stacked (Q-in-Q) VLAN interfaces, in a dedicated `vlan.md`
+- Handle unclean daemon exits better, e.g., `dbus-daemon` crashing and leaving
+  a stale pidfile behind, causing it to refuse to be restarted
 - Fix occasional blank or garbled `[ OK ]` lines at startup
 - Disallow multicast MAC addresses in custom MAC address configuration
 - Fix broken Wi-Fi 6 GHz band configuration.
+- Fix operational read of `/containers` failing and thereby aborting all
+  operational get-data, including RESTCONF/NETCONF reads — for containers
+  whose command contains shell metacharacters, e.g. `sh -c "... && ..."`
+- WireGuard interfaces are now regenerated when a referenced keystore key
+  changes: the asymmetric `private-key`, and the symmetric `preshared-key` at
+  both peer-group and per-peer level
+- Fix crash in operational data when a bridge has VLAN ranges configured: the
+  kernel may report ranges (e.g. `vlan 1 vlanEnd 3`) from `bridge vlan global
+  show`, which were not expanded, so `show interface` and other operational
+  reads failed.  Ranges are now expanded and listed correctly
 
+[ethernet]: ethernet.md#restricting-advertised-link-modes
+[BPI-R3]:   https://docs.banana-pi.org/en/BPI-R3/BananaPi_BPI-R3
 [AcerConnectVero]: ../board/aarch64/acer-connect-vero-w6m/
 
 [v26.04.0][] - 2026-04-30
@@ -72,7 +109,6 @@ All notable changes to the project are documented in this file.
 - Fix [BPI-R3][] PCIe devices failing to initialize on boot due to a missing
   clock definition in the device tree
 
-[BPI-R3]: https://wiki.banana-pi.org/Banana_Pi_BPI-R3
 [BPI-R4]: https://docs.banana-pi.org/en/BPI-R4/BananaPi_BPI-R4
 [ESPRESSObin]: https://espressobin.net/
 [SAMA7G54]: https://www.microchip.com/en-us/development-tool/ev21h18a
@@ -176,7 +212,7 @@ All notable changes to the project are documented in this file.
 
 - Fix CLI `copy` command problem to copy to scp/sftp destinations
 
-[BPI-R3-MINI]: https://wiki.banana-pi.org/Banana_Pi_BPI-R3_Mini
+[BPI-R3-MINI]: https://docs.banana-pi.org/en/BPI-R3_Mini/BananaPi_BPI-R3_Mini
 [SAMA7G54-EK]: https://www.microchip.com/en-us/development-tool/ev21h18a
 
 [v26.01.0][] - 2026-02-03
@@ -2099,7 +2135,9 @@ Supported YANG models in addition to those used by sysrepo and netopeer:
  - N/A
 
 [buildroot]:  https://buildroot.org/
-[UNRELEASED]: https://github.com/kernelkit/infix/compare/v26.03.0...HEAD
+[UNRELEASED]: https://github.com/kernelkit/infix/compare/v26.05.0...HEAD
+[v26.05.0]:   https://github.com/kernelkit/infix/compare/v26.04.0...v26.05.0
+[v26.04.0]:   https://github.com/kernelkit/infix/compare/v26.03.0...v26.04.0
 [v26.03.0]:   https://github.com/kernelkit/infix/compare/v26.02.0...v26.03.0
 [v26.02.0]:   https://github.com/kernelkit/infix/compare/v26.01.0...v26.02.0
 [v26.01.0]:   https://github.com/kernelkit/infix/compare/v25.11.0...v26.01.0
