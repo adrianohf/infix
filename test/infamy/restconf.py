@@ -343,61 +343,6 @@ class Device(Transport):
         # Copy candidate to running (acts as "commit", triggers sysrepo callbacks)
         self.copy("candidate", "running")
 
-    def put_config_dict(self, xpath, edit, retries=3):
-        """PATCH configuration for a single model to running-config
-
-        Uses candidate datastore + copy to running to trigger sysrepo
-        change callbacks, similar to how NETCONF edit-config + commit works.
-
-        Args:
-            xpath:   YANG module name
-            edit:    Configuration dictionary
-            retries: Number of retry attempts on failure (default 3)
-        """
-        try:
-            mod = self.lyctx.get_module(xpath)
-        except libyang.util.LibyangError:
-            raise Exception(f"YANG model '{xpath}' not found on device. "
-                            f"Model may not be installed or enabled. "
-                            f"Available models can be checked with get_schema_list()") from None
-
-        # Copy running to candidate first (to preserve existing config)
-        self.copy("running", "candidate")
-
-        # Parse and convert to get proper structure with module prefix
-        lyd = mod.parse_data_dict(edit, no_state=True, validate=False)
-        patch_data = json.loads(lyd.print_mem("json", with_siblings=True, pretty=False))
-
-        # PATCH to candidate datastore
-        url = f"{self.restconf_url}/ds/ietf-datastores:candidate"
-        last_error = None
-        for attempt in range(0, retries):
-            try:
-                response = requests_workaround_patch(
-                    url,
-                    json=patch_data,
-                    headers=self.headers,
-                    auth=self.auth,
-                    verify=False
-                )
-                response.raise_for_status()
-                last_error = None
-                break
-            except Exception as e:
-                last_error = e
-                if attempt < retries - 1:
-                    print(f"Failed PATCH to {url}: {e}  Retrying ...")
-                    time.sleep(1)
-                else:
-                    print(f"Failed PATCH to {url}: {e}")
-                continue
-
-        if last_error is not None:
-            raise last_error
-
-        # Copy candidate to running (acts as "commit", triggers sysrepo callbacks)
-        self.copy("candidate", "running")
-
     def patch_config(self, xpath, edit, retries=3):
         """PATCH configuration directly to running datastore
 
@@ -507,12 +452,26 @@ class Device(Transport):
     def reboot(self):
         self.call_rpc("ietf-system:system-restart")
 
-    def call_action(self, xpath):
+    def call_action(self, xpath, input_data=None):
         path = xpath_to_uri(xpath)
         url = f"{self.restconf_url}/data{path}"
+
+        # RFC 8040 wraps action input as {"<action-module>:input": {...}}.
+        # The action's module is the prefix of the closest namespaced
+        # xpath segment; for "/a:foo/b:bar/baz" that's "b".
+        body = None
+        if input_data:
+            module = None
+            for seg in xpath.split("/"):
+                if ":" in seg:
+                    module = seg.split(":", 1)[0]
+            if not module:
+                raise ValueError(f"cannot determine action module from {xpath}")
+            body = {f"{module}:input": input_data}
+
         response = requests_workaround_post(
             url,
-            json=None,
+            json=body,
             headers=self.headers,
             auth=self.auth,
             verify=False
