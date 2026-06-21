@@ -36,7 +36,7 @@ else
 CONFD_CONF_OPTS += --disable-gps
 endif
 define CONFD_INSTALL_EXTRA
-	for fn in confd.conf resolvconf.conf; do \
+	for fn in confd.conf crond.conf resolvconf.conf; do \
 		cp $(CONFD_PKGDIR)/$$fn  $(FINIT_D)/available/; \
 		ln -sf ../available/$$fn $(FINIT_D)/enabled/$$fn; \
 	done
@@ -91,6 +91,12 @@ define CONFD_INSTALL_YANG_MODULES_GPS
 	$(BR2_EXTERNAL_INFIX_PATH)/utils/srload $(@D)/yang/gps.inc
 endef
 endif
+ifeq ($(BR2_PACKAGE_WEBUI),y)
+define CONFD_INSTALL_YANG_MODULES_WEBUI
+	$(COMMON_SYSREPO_ENV) \
+	$(BR2_EXTERNAL_INFIX_PATH)/utils/srload $(@D)/yang/web.inc
+endef
+endif
 
 # PER_PACKAGE_DIR
 # Since the last package in the dependency chain that runs sysrepoctl is confd, we need to
@@ -121,6 +127,7 @@ CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_CONTAINERS
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_WIFI
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_GPS
+CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_YANG_MODULES_WEBUI
 CONFD_POST_INSTALL_TARGET_HOOKS += CONFD_INSTALL_IN_ROMFS
 CONFD_TARGET_FINALIZE_HOOKS += CONFD_CLEANUP
 
