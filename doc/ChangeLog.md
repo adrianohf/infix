@@ -3,12 +3,28 @@ Change Log
 
 All notable changes to the project are documented in this file.
 
-[v26.06.0][UNRELEASED]
+[v26.06.0][] - 2026-07-01
 -------------------------
+
+> [!NOTE]
+> Noteworthy changes and additions in this release:
+>
+> **🌐 Web Interface:** Infix gets its first-ever web interface!  Browse live
+> status and a full operational tree, handle common tasks from curated
+> configuration pages, and drop into a YANG tree editor for everything else.
+> A maintenance section covers firmware upgrade, backup & restore, and more.
+>
+> **📶 Wi-Fi Roaming & Mesh:** Access points sharing an SSID can hand clients
+> off seamlessly with 802.11k/v/r, form a cable-free 802.11s mesh backhaul,
+> and steer dual-band clients onto the faster 5/6 GHz band.
+>
+> **🗓️ System Scheduling:** Reusable time schedules based on ietf-schedule
+> (RFC 9922) let features like scheduled reboot and software update checks
+> run on a recurring, cron-style calendar.
 
 ### Changes
 
-- Upgrade Linux kernel to 6.18.36 (LTS)
+- Upgrade Linux kernel to 6.18.37 (LTS)
 - Upgrade Buildroot to 2025.02.15 (LTS)
 - Add basic web interface: static status pages and a tree view of operational
   status.  Curated configuration pages for some common tasks and a YANG tree
@@ -27,6 +43,13 @@ All notable changes to the project are documented in this file.
   iCalendar recurrence grouping pruned to cron-expressible rules.  Schedules
   are reusable time-specs; features (`scheduled-reboot`,
   `software/check-update`) trigger off them via a schedule reference
+- Configuring multiple BSS (more than one SSID) on a single Wi-Fi radio now
+  requires an explicitly configured MAC address per BSS
+- New operational `advertised-pmd-types` leaf-list on each Ethernet interface,
+  exposing the link modes currently advertised, to compare against the
+  `supported-pmd-types` introduced in v26.05.0
+- Release assets no longer ship separate `.sha256` checksum files; the
+  download page now publishes a SHA-256 checksum for each asset directly
 
 ### Fixes
 
@@ -39,6 +62,14 @@ All notable changes to the project are documented in this file.
   default `admin` user no permission to read or write the file from shell
 - Fix admin url shown for HTTP/HTTPS links in <https://network.local> browser,
   used pre-conflict resolution hostname.local, instead of hostname-2.local
+- Fix unreadable per-port temperature sensor names in `show hardware` on
+  Marvell based switches: each sensor is now named after the front-panel port
+  it serves (e.g. `e1`, `e2`) instead of a raw device-tree path.  `show
+  system` also reports a representative SoC temperature on CN913x platforms
+- Fix missing `contact` and `location` settings in operational status; the
+  values were configurable but never returned on RESTCONF/NETCONF reads
+- Fix spurious YANG validation warnings, for NTP and WireGuard configuration,
+  emitted on every NETCONF session and schema load
 
 [wifi]: https://www.kernelkit.org/infix/latest/wifi/
 
@@ -2174,7 +2205,7 @@ Supported YANG models in addition to those used by sysrepo and netopeer:
  - N/A
 
 [buildroot]:  https://buildroot.org/
-[UNRELEASED]: https://github.com/kernelkit/infix/compare/v26.05.0...HEAD
+[UNRELEASED]: https://github.com/kernelkit/infix/compare/v26.06.0...HEAD
 [v26.06.0]:   https://github.com/kernelkit/infix/compare/v26.05.0...v26.06.0
 [v26.05.0]:   https://github.com/kernelkit/infix/compare/v26.04.0...v26.05.0
 [v26.04.0]:   https://github.com/kernelkit/infix/compare/v26.03.0...v26.04.0
