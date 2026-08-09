@@ -8,7 +8,7 @@ All notable changes to the project are documented in this file.
 
 ### Changes
 
-- Upgrade Linux kernel to 6.18.41 (LTS)
+- Upgrade Linux kernel to 6.18.43 (LTS)
 - Upgrade Buildroot to 2025.02.15 (LTS)
 - Add support for firewall address-set (ipset): named sets of IP addresses and
   networks, usable as zone sources for per-IP access control, issue #1189
@@ -19,14 +19,6 @@ All notable changes to the project are documented in this file.
 
 - Fix annoying "cannot deselect all services" or reset to YANG default in the
   web interface's firewall configuration page
-- Fix `statd` timeout warnings in the log.  Updates to the mDNS neighbor
-  table, and status snapshots, could fail with:
-
-        statd[3658]: mdns: sr_apply_changes: Timeout expired
-        statd[3658]: Error, getting operational data: User callback failed
-
-  Such operations are now allowed up to 60 seconds to complete, same as for
-  other services in the system
 
 [v26.06.0][] - 2026-07-01
 -------------------------
