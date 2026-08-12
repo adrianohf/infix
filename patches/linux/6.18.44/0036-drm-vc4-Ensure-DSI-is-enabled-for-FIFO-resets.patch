@@ -1,7 +1,8 @@
-From c3570c69c6627d18222adf6c4d47d3894a2f21a7 Mon Sep 17 00:00:00 2001
+From 64bef9c089e03b8a07bd24474c8420fc20e6e7bb Mon Sep 17 00:00:00 2001
 From: Dave Stevenson <dave.stevenson@raspberrypi.com>
 Date: Fri, 5 Apr 2024 17:51:55 +0100
-Subject: [PATCH 36/50] drm/vc4: Ensure DSI is enabled for FIFO resets
+Subject: [PATCH 36/51] drm/vc4: Ensure DSI is enabled for FIFO resets
+Organization: Wires
 
 The block must be enabled for the FIFO resets to be actioned,
 so ensure this is the case.
@@ -12,7 +13,7 @@ Signed-off-by: Dave Stevenson <dave.stevenson@raspberrypi.com>
  1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/gpu/drm/vc4/vc4_dsi.c b/drivers/gpu/drm/vc4/vc4_dsi.c
-index 1eba498d276f..de963edefb76 100644
+index 1eba498d276f8..de963edefb760 100644
 --- a/drivers/gpu/drm/vc4/vc4_dsi.c
 +++ b/drivers/gpu/drm/vc4/vc4_dsi.c
 @@ -400,7 +400,8 @@

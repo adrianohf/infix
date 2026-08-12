@@ -1,7 +1,8 @@
-From c7ef4e755001e84b00ca341c6096043fd7c8c4d2 Mon Sep 17 00:00:00 2001
+From 77e581650a4ed66ab918b7a8917b1e4f963bad97 Mon Sep 17 00:00:00 2001
 From: Dave Stevenson <dave.stevenson@raspberrypi.com>
 Date: Tue, 9 Jan 2024 18:44:49 +0000
-Subject: [PATCH 40/50] drm/bridge: tc358762: revert move ops to enable
+Subject: [PATCH 40/51] drm/bridge: tc358762: revert move ops to enable
+Organization: Wires
 
 Reverts 8a4b2fc9c91a ("drm/bridge: tc358762: Split register programming from pre-enable to enable")
 as we want the config commands sent before video starts.
@@ -12,7 +13,7 @@ Signed-off-by: Dave Stevenson <dave.stevenson@raspberrypi.com>
  1 file changed, 10 deletions(-)
 
 diff --git a/drivers/gpu/drm/bridge/tc358762.c b/drivers/gpu/drm/bridge/tc358762.c
-index 73b169026e63..6164932edfec 100644
+index 73b169026e63b..6164932edfec9 100644
 --- a/drivers/gpu/drm/bridge/tc358762.c
 +++ b/drivers/gpu/drm/bridge/tc358762.c
 @@ -202,15 +202,6 @@ static void tc358762_pre_enable(struct drm_bridge *bridge,

@@ -1,11 +1,12 @@
-From d5a3c15edcb36a7147906e5e5689e1f7e5accb24 Mon Sep 17 00:00:00 2001
+From dcf489ea793cb3373113fb6fc0b4707423c001b7 Mon Sep 17 00:00:00 2001
 From: Mattias Walström <lazzer@gmail.com>
 Date: Tue, 20 Jan 2026 20:18:45 +0100
-Subject: [PATCH 32/50] wifi: brcmfmac: reduce log noise during AP to station
+Subject: [PATCH 32/51] wifi: brcmfmac: reduce log noise during AP to station
  transition
 MIME-Version: 1.0
 Content-Type: text/plain; charset=UTF-8
 Content-Transfer-Encoding: 8bit
+Organization: Wires
 
 When transitioning from AP mode to station mode (e.g., hostapd stopping
 and wpa_supplicant starting), several non-fatal errors can occur:
@@ -27,7 +28,7 @@ Signed-off-by: Mattias Walström <lazzer@gmail.com>
  1 file changed, 9 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
-index acdb947ba51b..48963f388ea3 100644
+index acdb947ba51bb..48963f388ea3e 100644
 --- a/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 +++ b/drivers/net/wireless/broadcom/brcm80211/brcmfmac/cfg80211.c
 @@ -1130,13 +1130,15 @@ static void brcmf_scan_config_mpc(struct brcmf_if *ifp, int mpc)
